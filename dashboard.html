@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="css/dashboard.css">
+    <title>BusTrack - Dashboard</title>
+</head>
+
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="app-name">
+            <div class="app-icon">🚌</div>
+            <span>BusTrack</span>
+        </div>
+        <div class="profile-icon" onclick="showProfile()">
+            👤
+        </div>
+    </div>
+
+    <!-- Main Content Page -->
+    <div class="main-content" id="mainContent">
+        <div class="welcome-section">
+            <h2>Welcome, <span id="userName">User</span>!</h2>
+            <p>Track your bus in real-time</p>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="search-section">
+            <input type="text" class="search-bar" placeholder="Search for bus routes or stops..." id="searchBar">
+        </div>
+
+        <!-- Bus Cards Container -->
+        <div class="bus-cards-container">
+            <!-- Bus 1 Card -->
+            <div class="bus-card">
+                <div class="bus-header">
+                    <h3>
+                        <span>🚌</span>
+                        Bus 1
+                    </h3>
+                    <div class="live-indicator"></div>
+                </div>
+                <div class="bus-map">
+                    <div class="map-placeholder">📍 Map View</div>
+                </div>
+                <div class="bus-info">
+                    <div class="info-row">
+                        <span class="info-label">Bus No:</span>
+                        <span class="bus-number">TN 45 AB 1234</span>
+                    </div>
+                    <div class="route-details">
+                        <div class="route-header">🗺️ Route</div>
+                        <div class="route-list">
+                            <div class="route-point start"><strong>Start:</strong> College</div>
+                            <div class="route-point">Thirunagar</div>
+                            <div class="route-point">Andalpuram</div>
+                            <div class="route-point end"><strong>End:</strong> Natraj Theatre</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bus 2 Card -->
+            <div class="bus-card">
+                <div class="bus-header">
+                    <h3>
+                        <span>🚌</span>
+                        Bus 2
+                    </h3>
+                    <div class="live-indicator"></div>
+                </div>
+                <div class="bus-map">
+                    <div class="map-placeholder">📍 Map View</div>
+                </div>
+                <div class="bus-info">
+                    <div class="info-row">
+                        <span class="info-label">Bus No:</span>
+                        <span class="bus-number">TN 45 CD 5678</span>
+                    </div>
+                    <div class="route-details">
+                        <div class="route-header">🗺️ Route</div>
+                        <div class="route-list">
+                            <div class="route-point start"><strong>Start:</strong> College</div>
+                            <div class="route-point">Main Road</div>
+                            <div class="route-point">City Center</div>
+                            <div class="route-point end"><strong>End:</strong> Crime Branch</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bus 3 Card -->
+            <div class="bus-card">
+                <div class="bus-header">
+                    <h3>
+                        <span>🚌</span>
+                        Bus 3
+                    </h3>
+                    <div class="live-indicator"></div>
+                </div>
+                <div class="bus-map">
+                    <div class="map-placeholder">📍 Map View</div>
+                </div>
+                <div class="bus-info">
+                    <div class="info-row">
+                        <span class="info-label">Bus No:</span>
+                        <span class="bus-number">TN 45 EF 9012</span>
+                    </div>
+                    <div class="route-details">
+                        <div class="route-header">🗺️ Route</div>
+                        <div class="route-list">
+                            <div class="route-point start"><strong>Start:</strong> College</div>
+                            <div class="route-point">Bus Stand</div>
+                            <div class="route-point">Market Street</div>
+                            <div class="route-point end"><strong>End:</strong> Goripalayam</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bus 4 Card -->
+            <div class="bus-card">
+                <div class="bus-header">
+                    <h3>
+                        <span>🚌</span>
+                        Bus 4
+                    </h3>
+                    <div class="live-indicator"></div>
+                </div>
+                <div class="bus-map">
+                    <div class="map-placeholder">📍 Map View</div>
+                </div>
+                <div class="bus-info">
+                    <div class="info-row">
+                        <span class="info-label">Bus No:</span>
+                        <span class="bus-number">TN 45 GH 3456</span>
+                    </div>
+                    <div class="route-details">
+                        <div class="route-header">🗺️ Route</div>
+                        <div class="route-list">
+                            <div class="route-point start"><strong>Start:</strong> College</div>
+                            <div class="route-point">Railway Station</div>
+                            <div class="route-point">Town Hall</div>
+                            <div class="route-point end"><strong>End:</strong> Moondrumavadi</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile Update Page -->
+    <div class="profile-page" id="profilePage">
+        <div class="profile-header">
+            <div class="back-btn" onclick="showMain()">←</div>
+            <h2>Profile Settings</h2>
+        </div>
+
+        <div class="profile-card">
+            <div class="profile-avatar">👤</div>
+
+            <form id="profileForm" onsubmit="saveProfile(event)">
+                <div class="form-group">
+                    <label for="profileName">Full Name</label>
+                    <input type="text" id="profileName" placeholder="Enter your name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="profilePhone">Mobile Number</label>
+                    <input type="tel" id="profilePhone" placeholder="+91 XXXXXXXXXX" disabled>
+                    <p class="info-text">Phone number cannot be changed</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="busRoute">Select Your Bus Route</label>
+                    <select id="busRoute" required>
+                        <option value="">-- Select Bus Route --</option>
+                        <option value="bus1">Bus 1 (College - Thirunagar/Andalpuram/Natraj Theatre)</option>
+                        <option value="bus2">Bus 2 (College - Crime branch)</option>
+                        <option value="bus3">Bus 3 (College - Goripalayam)</option>
+                        <option value="bus4">Bus 4 (College - Moondrumavadi)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="department">Department</label>
+                    <select id="department" required>
+                        <option value="">-- Select Department --</option>
+                        <option value="cse">Computer Science & Engineering</option>
+                        <option value="ece">Electronics & Communication Engineering</option>
+                        <option value="eee">Electrical & Electronics Engineering</option>
+                        <option value="mech">Mechanical Engineering</option>
+                        <option value="civil">Civil Engineering</option>
+                        <option value="it">Information Technology</option>
+                        <option value="mba">MBA</option>
+                        <option value="mca">MCA</option>
+                        <option value="others">Others</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="save-btn">Save Profile</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/dashboard.js"></script>
+</body>
+
+</html>

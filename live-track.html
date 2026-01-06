@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="css/live-track.css">
+    <title>Live Track Your Bus</title>
+    <!--<style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+            height: 60px;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            padding: 0 2rem;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .logo-icon {
+            width: 35px;
+            height: 35px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1rem;
+        }
+
+        /* Main Content */
+        .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem 1.5rem;
+            background: transparent;
+            padding-bottom: 100px;
+        }
+
+        h1 {
+            font-size: 2rem;
+            color: white;
+            margin-bottom: 3rem;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        /* Map Container */
+        .map-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            height: 500px;
+            margin-bottom: 3rem;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Google Maps Style Background */
+        .map-background {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: #e5e3df;
+        }
+
+        /* Roads */
+        .road {
+            position: absolute;
+            background: #ffffff;
+            border: 1px solid #d4d4d4;
+        }
+
+        .road-horizontal {
+            height: 25px;
+            width: 100%;
+            left: 0;
+        }
+
+        .road-vertical {
+            width: 25px;
+            height: 100%;
+            top: 0;
+        }
+
+        .road1 { top: 20%; }
+        .road2 { top: 45%; }
+        .road3 { top: 70%; }
+        .road4 { left: 25%; }
+        .road5 { left: 50%; }
+        .road6 { left: 75%; }
+
+        /* Road Markings */
+        .road-marking {
+            position: absolute;
+            background: #f9d442;
+        }
+
+        .marking-h {
+            width: 30px;
+            height: 3px;
+        }
+
+        .marking-v {
+            width: 3px;
+            height: 30px;
+        }
+
+        /* Park/Green Areas */
+        .park {
+            position: absolute;
+            background: #c8e6c9;
+            border-radius: 8px;
+        }
+
+        .park1 {
+            width: 100px;
+            height: 80px;
+            left: 5%;
+            top: 25%;
+        }
+
+        .park2 {
+            width: 90px;
+            height: 70px;
+            right: 8%;
+            top: 52%;
+        }
+
+        /* Buildings */
+        .building-block {
+            position: absolute;
+            background: #d7ccc8;
+            border: 1px solid #bcaaa4;
+        }
+
+        .block1 {
+            width: 80px;
+            height: 60px;
+            left: 30%;
+            top: 10%;
+        }
+
+        .block2 {
+            width: 70px;
+            height: 65px;
+            right: 15%;
+            top: 15%;
+        }
+
+        .block3 {
+            width: 90px;
+            height: 55px;
+            left: 10%;
+            bottom: 15%;
+        }
+
+        .block4 {
+            width: 75px;
+            height: 70px;
+            right: 10%;
+            bottom: 12%;
+        }
+
+        /* Bus Route Line */
+        .route-line {
+            position: absolute;
+            width: 85%;
+            height: 6px;
+            background: linear-gradient(90deg, #4285f4 0%, #4285f4 100%);
+            top: 28%;
+            left: 8%;
+            transform: rotate(-42deg);
+            transform-origin: left;
+            border-radius: 3px;
+            box-shadow: 0 2px 8px rgba(66, 133, 244, 0.4);
+        }
+
+        /* Bus Icon */
+        .bus-marker {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            background: #1e88e5;
+            border-radius: 50%;
+            top: 32%;
+            left: 28%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 6px 20px rgba(30, 136, 229, 0.5);
+            animation: busFloat 2s ease-in-out infinite;
+            z-index: 10;
+            border: 4px solid white;
+        }
+
+        .bus-marker::before {
+            content: '🚌';
+            font-size: 2rem;
+        }
+
+        @keyframes busFloat {
+            0%, 100% {
+                transform: scale(1) translateY(0);
+                box-shadow: 0 6px 20px rgba(30, 136, 229, 0.5);
+            }
+            50% {
+                transform: scale(1.08) translateY(-5px);
+                box-shadow: 0 10px 30px rgba(30, 136, 229, 0.6);
+            }
+        }
+
+        /* Live Tracking Bubble */
+        .now-bubble {
+            position: absolute;
+            top: 18%;
+            left: 32%;
+            background: white;
+            padding: 0.6rem 1.3rem;
+            border-radius: 20px;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            animation: bubbleFloat 3s ease-in-out infinite;
+            z-index: 11;
+        }
+
+        @keyframes bubbleFloat {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-8px);
+            }
+        }
+
+        .signal-icon {
+            color: #1e88e5;
+            font-size: 1rem;
+        }
+
+        .now-text {
+            color: #1e88e5;
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+
+        /* Destination Pin */
+        .destination-pin {
+            position: absolute;
+            bottom: 18%;
+            right: 22%;
+            z-index: 9;
+        }
+
+        .pin-head {
+            width: 36px;
+            height: 36px;
+            background: #ea4335;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            border: 3px solid white;
+            box-shadow: 0 4px 12px rgba(234, 67, 53, 0.4);
+            position: relative;
+        }
+
+        .pin-head::after {
+            content: '';
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: white;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        /* Map Controls */
+        .map-controls {
+            position: absolute;
+            right: 15px;
+            bottom: 80px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 12;
+        }
+
+        .map-btn {
+            width: 40px;
+            height: 40px;
+            background: white;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+            font-size: 1.2rem;
+            color: #666;
+            transition: all 0.2s ease;
+        }
+
+        .map-btn:hover {
+            background: #f5f5f5;
+            transform: scale(1.05);
+        }
+
+        /* Current Location Button */
+        .location-btn {
+            position: absolute;
+            right: 15px;
+            bottom: 20px;
+            width: 45px;
+            height: 45px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+            z-index: 12;
+        }
+
+        .location-btn::before {
+            content: '📍';
+            font-size: 1.3rem;
+        }
+
+        /* Get Started Button */
+        .get-started-btn {
+            width: 100%;
+            max-width: 500px;
+            padding: 1.2rem;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.3rem;
+            font-weight: 700;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .get-started-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .get-started-btn:active {
+            transform: translateY(0);
+        }
+
+        /* Bottom Navigation */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: white;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .nav-icon:hover {
+            background: #f0f0f0;
+        }
+
+        .nav-icon.circle {
+            width: 60px;
+            height: 60px;
+            border: 3px solid #666;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.6rem;
+                margin-bottom: 2rem;
+            }
+
+            .map-container {
+                height: 400px;
+            }
+
+            .get-started-btn {
+                font-size: 1.1rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .content {
+                padding: 1.5rem 1rem;
+                padding-bottom: 100px;
+            }
+
+            h1 {
+                font-size: 1.4rem;
+            }
+
+            .map-container {
+                height: 350px;
+            }
+        }
+    </style>-->
+</head>
+
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="logo">
+            <div class="logo-icon">🚌</div>
+            <span>BusTrack</span>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="content">
+        <h1>Live track your bus</h1>
+
+        <!-- Map Container -->
+        <div class="map-container">
+            <!-- Map Background -->
+            <div class="map-background"></div>
+
+            <!-- Roads -->
+            <div class="road road-horizontal road1"></div>
+            <div class="road road-horizontal road2"></div>
+            <div class="road road-horizontal road3"></div>
+            <div class="road road-vertical road4"></div>
+            <div class="road road-vertical road5"></div>
+            <div class="road road-vertical road6"></div>
+
+            <!-- Parks/Green Areas -->
+            <div class="park park1"></div>
+            <div class="park park2"></div>
+
+            <!-- Buildings -->
+            <div class="building-block block1"></div>
+            <div class="building-block block2"></div>
+            <div class="building-block block3"></div>
+            <div class="building-block block4"></div>
+
+            <!-- Bus Route Line -->
+            <div class="route-line"></div>
+
+            <!-- Live Tracking Bubble -->
+            <div class="now-bubble">
+                <span class="signal-icon">📶</span>
+                <span class="now-text">Now</span>
+            </div>
+
+            <!-- Bus Marker -->
+            <div class="bus-marker"></div>
+
+            <!-- Destination Pin -->
+            <div class="destination-pin">
+                <div class="pin-head"></div>
+            </div>
+
+            <!-- Map Controls -->
+            <div class="map-controls">
+                <div class="map-btn">+</div>
+                <div class="map-btn">−</div>
+            </div>
+
+            <!-- Current Location Button -->
+            <div class="location-btn"></div>
+        </div>
+
+        <!-- Get Started Button -->
+        <button class="get-started-btn" onclick="handleGetStarted()">
+            GET STARTED
+        </button>
+    </div>
+
+
+
+    <script src="js/dashboard.js"></script>
+</body>
+
+</html>
