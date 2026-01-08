@@ -1,25 +1,38 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Admin Dashboard</title>
-  <link rel="stylesheet" href="../css/admin.css">
+  <link rel="stylesheet" href="../css/admin-common.css?v=2">
+  <link rel="stylesheet" href="../css/admin-dashboard.css?v=2">
 </head>
 <body>
 
-  <h1>Admin Dashboard</h1>
-
-  <div class="grid">
-    <div class="card">Total Buses: <b id="busCount">4</b></div>
-    <div class="card">Active Buses: <b>3</b></div>
-    <div class="card">Users: <b>25</b></div>
-    <div class="card">Routes: <b>4</b></div>
+  <div class="header">
+    <div class="app-name"><span class="app-icon">🚌</span> Transport Admin</div>
+    <div class="profile-icon">A</div>
   </div>
 
-  <nav>
-    <a href="buses.html">Manage Buses</a>
-    <a href="routes.html">Manage Routes</a>
-    <a href="users.html">View Users</a>
-  </nav>
+  <div class="main-content">
+    <div class="welcome-section">
+      <h2>Admin Dashboard</h2>
+      <p class="muted">Overview of buses, users and routes</p>
+    </div>
+
+    <div class="grid">
+      <div class="card stat-card">Total Buses: <b id="busCount">4</b></div>
+      <div class="card stat-card">Active Buses: <b>3</b></div>
+      <div class="card stat-card">Users: <b>25</b></div>
+      <div class="card stat-card">Routes: <b>4</b></div>
+    </div>
+
+    <nav>
+      <a href="buses.html">Manage Buses</a>
+      <a href="routes.html">Manage Routes</a>
+      <a href="users.html">View Users</a>
+    </nav>
+  </div>
 
 </body>
 </html>

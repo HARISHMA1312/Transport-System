@@ -1,0 +1,26 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit,minmax(220px,1fr));
+  gap: 1.5rem;
+}
+
+.grid .card {
+  text-align: center;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+nav {
+  text-align: center;
+  margin-top: 2rem;
+}
+
+nav a {
+  text-decoration: none;
+  font-weight: 600;
+  margin: 0 15px;
+  color: #667eea;
+}
+nav a.active {
+  color: #764ba2;
+}

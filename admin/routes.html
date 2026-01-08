@@ -2,21 +2,36 @@
 <html>
 <head>
   <title>Route Management</title>
-  <link rel="stylesheet" href="../css/admin.css">
+  <link rel="stylesheet" href="../css/admin-common.css?v=2">
+  <link rel="stylesheet" href="../css/admin-routes.css?v=2">
 </head>
 <body>
 
-<h2>Route Management</h2>
+  <div class="header">
+    <div class="app-name"><span class="app-icon">🚌</span> Transport Admin</div>
+    <div class="profile-icon">A</div>
+  </div>
 
-<input placeholder="Route Name">
-<input placeholder="Stops (College → Stop1 → Stop2)">
+  <div class="main-content">
 
-<button>Add Route</button>
+    <div class="welcome-section">
+      <h2>Route Management</h2>
+    </div>
 
-<ul>
-  <li>College → Thirunagar → Natraj Theatre</li>
-  <li>College → Crime Branch</li>
-</ul>
+    <div class="card route-card">
+      <div class="route-form">
+        <input placeholder="Route Name">
+        <input placeholder="Stops (College → Stop1 → Stop2)">
+        <button class="btn-sm">Add Route</button>
+      </div>
+
+      <ul class="route-list">
+        <li>College → Thirunagar → Natraj Theatre</li>
+        <li>College → Crime Branch</li>
+      </ul>
+    </div>
+
+  </div>
 
 </body>
 </html>

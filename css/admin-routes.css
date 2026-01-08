@@ -1,0 +1,23 @@
+.route-card {
+  padding: 2rem;
+}
+
+.route-form {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.route-list {
+  list-style: none;
+}
+
+.route-list li {
+  background: #f4f6fb;
+  padding: 1rem;
+  border-radius: 12px;
+  margin-bottom: 0.7rem;
+}
+.route-list li:hover {
+  background: #e1e8f6;
+}

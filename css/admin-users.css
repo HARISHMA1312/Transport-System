@@ -1,0 +1,11 @@
+.card table {
+  margin-top: 1rem;
+}
+
+.card th {
+  text-align: left;
+}
+.card td {
+  padding: 0.8rem 0;
+  border-bottom: 1px solid #e0e0e0;
+}
