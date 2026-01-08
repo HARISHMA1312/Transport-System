@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Register - BusTrack</title>
+    <link rel="stylesheet" href="css/login.css">
+</head>
+<body>
+    <div class="login-container">
+        <!-- Logo Section -->
+        <div class="logo-section">
+            <div class="logo-icon">🚌</div>
+            <h1>Admin Registration</h1>
+            <p class="subtitle">Create your admin account</p>
+        </div>
+
+        <!-- Admin Sign Up Form -->
+        <div class="form-section" style="display: block;">
+            <div class="input-group">
+                <label for="adminName">Admin Name</label>
+                <div class="input-wrapper">
+                    <span class="input-icon">👤</span>
+                    <input type="text" id="adminName" placeholder="Enter admin name" required>
+                </div>
+                <span class="error-message" id="adminNameError">Please enter admin name</span>
+            </div>
+
+            <div class="input-group">
+                <label for="adminEmail">Email</label>
+                <div class="input-wrapper">
+                    <span class="input-icon">📧</span>
+                    <input type="email" id="adminEmail" placeholder="Enter email" required>
+                </div>
+                <span class="error-message" id="adminEmailError">Please enter a valid email</span>
+            </div>
+
+            <div class="input-group">
+                <label for="adminPhone">Mobile Number</label>
+                <div class="phone-input">
+                    <div class="country-code">+91</div>
+                    <div class="input-wrapper phone-number">
+                        <span class="input-icon">📱</span>
+                        <input type="tel" id="adminPhone" placeholder="Enter 10-digit number" maxlength="10" required>
+                    </div>
+                </div>
+                <span class="error-message" id="adminPhoneError">Please enter a valid 10-digit mobile number</span>
+            </div>
+
+            <div class="input-group">
+                <label for="adminPassword">Password</label>
+                <div class="input-wrapper">
+                    <span class="input-icon">🔒</span>
+                    <input type="password" id="adminPassword" placeholder="Enter password" required>
+                </div>
+                <span class="error-message" id="adminPasswordError">Please enter a password</span>
+            </div>
+
+            <button class="submit-btn" id="adminRegisterBtn">Register</button>
+
+            <div class="switch-section">
+                Already have an account? <a href="admin-login.html" class="switch-link">Login here</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/dashboard.js"></script>
+</body>
+</html>

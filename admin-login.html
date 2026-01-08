@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login - BusTrack</title>
+    <link rel="stylesheet" href="css/login.css">
+</head>
+<body>
+    <div class="login-container">
+        <!-- Logo Section -->
+        <div class="logo-section">
+            <div class="logo-icon">🚌</div>
+            <h1>Admin Login</h1>
+            <p class="subtitle">Enter your credentials</p>
+        </div>
+
+        <!-- Admin Login Section -->
+        <div class="login-section" style="display: block;">
+            <div class="input-group">
+                <label for="adminLoginPhone">Mobile Number</label>
+                <div class="phone-input">
+                    <div class="country-code">+91</div>
+                    <div class="input-wrapper phone-number">
+                        <span class="input-icon">📱</span>
+                        <input type="tel" id="adminLoginPhone" placeholder="Enter 10-digit number" maxlength="10" required>
+                    </div>
+                </div>
+                <span class="error-message" id="adminLoginPhoneError">Please enter a valid 10-digit mobile number</span>
+            </div>
+
+            <div class="input-group">
+                <label for="adminLoginPassword">Password</label>
+                <div class="input-wrapper">
+                    <span class="input-icon">🔒</span>
+                    <input type="password" id="adminLoginPassword" placeholder="Enter password" required>
+                </div>
+                <span class="error-message" id="adminLoginPasswordError">Invalid phone or password</span>
+            </div>
+
+            <button class="submit-btn" id="adminLoginBtn">Login</button>
+
+            <div class="switch-section">
+                Don't have an account? <a href="admin-register.html" class="switch-link">Register here</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/dashboard.js"></script>
+</body>
+</html>

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Login - BusTrack</title>
+    <link rel="stylesheet" href="css/login.css">
+</head>
+<body>
+    <div class="login-container">
+        <!-- Logo Section -->
+        <div class="logo-section">
+            <div class="logo-icon">🚌</div>
+            <h1>User Login</h1>
+            <p class="subtitle">Enter your credentials</p>
+        </div>
+
+        <!-- User Login Section -->
+        <div class="login-section" style="display: block;">
+            <div class="input-group">
+                <label for="userLoginPhone">Mobile Number</label>
+                <div class="phone-input">
+                    <div class="country-code">+91</div>
+                    <div class="input-wrapper phone-number">
+                        <span class="input-icon">📱</span>
+                        <input type="tel" id="userLoginPhone" placeholder="Enter 10-digit number" maxlength="10" required>
+                    </div>
+                </div>
+                <span class="error-message" id="userLoginPhoneError">Please enter a valid 10-digit mobile number</span>
+            </div>
+
+            <div class="input-group">
+                <label for="userLoginPassword">Password</label>
+                <div class="input-wrapper">
+                    <span class="input-icon">🔒</span>
+                    <input type="password" id="userLoginPassword" placeholder="Enter password" required>
+                </div>
+                <span class="error-message" id="userLoginPasswordError">Invalid phone or password</span>
+            </div>
+
+            <button class="submit-btn" id="userLoginBtn">Login</button>
+
+            <div class="switch-section">
+                Don't have an account? <a href="user-register.html" class="switch-link">Register here</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/dashboard.js"></script>
+</body>
+</html>

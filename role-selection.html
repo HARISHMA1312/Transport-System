@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BusTrack - Select Role</title>
+    <link rel="stylesheet" href="css/login.css">
+</head>
+<body>
+    <div class="login-container">
+        <!-- Logo Section -->
+        <div class="logo-section">
+            <div class="logo-icon">🚌</div>
+            <h1>Welcome to BusTrack</h1>
+            <p class="subtitle">Select your role to continue</p>
+        </div>
+
+        <!-- Role Selection Cards -->
+        <div class="role-cards">
+            <div class="role-card" onclick="goToUserRegister()">
+                <div class="role-card-icon">👤</div>
+                <h2>User</h2>
+                <p>Track your bus in real-time</p>
+            </div>
+
+            <div class="role-card" onclick="goToAdminRegister()">
+                <div class="role-card-icon">👨‍💼</div>
+                <h2>Admin</h2>
+                <p>Manage bus routes and tracking</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function goToUserRegister() {
+            window.location.href = 'user-register.html';
+        }
+
+        function goToAdminRegister() {
+            window.location.href = 'admin-register.html';
+        }
+    </script>
+</body>
+</html>

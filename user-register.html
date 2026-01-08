@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Register - BusTrack</title>
+    <link rel="stylesheet" href="css/login.css">
+</head>
+<body>
+    <div class="login-container">
+        <!-- Logo Section -->
+        <div class="logo-section">
+            <div class="logo-icon">🚌</div>
+            <h1>User Registration</h1>
+            <p class="subtitle">Create your account</p>
+        </div>
+
+        <!-- User Sign Up Form -->
+        <div class="form-section" style="display: block;">
+            <div class="input-group">
+                <label for="userName">Full Name</label>
+                <div class="input-wrapper">
+                    <span class="input-icon">👤</span>
+                    <input type="text" id="userName" placeholder="Enter your full name" required>
+                </div>
+                <span class="error-message" id="userNameError">Please enter your name</span>
+            </div>
+
+            <div class="input-group">
+                <label for="userPhone">Mobile Number</label>
+                <div class="phone-input">
+                    <div class="country-code">+91</div>
+                    <div class="input-wrapper phone-number">
+                        <span class="input-icon">📱</span>
+                        <input type="tel" id="userPhone" placeholder="Enter 10-digit number" maxlength="10" required>
+                    </div>
+                </div>
+                <span class="error-message" id="userPhoneError">Please enter a valid 10-digit mobile number</span>
+            </div>
+
+            <div class="input-group">
+                <label for="userPassword">Password</label>
+                <div class="input-wrapper">
+                    <span class="input-icon">🔒</span>
+                    <input type="password" id="userPassword" placeholder="Enter password" required>
+                </div>
+                <span class="error-message" id="userPasswordError">Please enter a password</span>
+            </div>
+
+            <button class="submit-btn" id="userRegisterBtn">Register</button>
+
+            <div class="switch-section">
+                Already have an account? <a href="user-login.html" class="switch-link">Login here</a>
+            </div>
+        </div>
+
+        <!-- User OTP Verification Section -->
+        <div class="otp-section" id="userOtpSection">
+            <div class="otp-info">
+                OTP sent to <strong id="userDisplayPhone"></strong>
+                <br><a href="#" class="resend-btn" id="userEditNumber">Edit number</a>
+            </div>
+
+            <div class="input-group">
+                <label>Enter OTP</label>
+                <div class="otp-inputs">
+                    <input type="text" class="otp-input" maxlength="1" data-index="0">
+                    <input type="text" class="otp-input" maxlength="1" data-index="1">
+                    <input type="text" class="otp-input" maxlength="1" data-index="2">
+                    <input type="text" class="otp-input" maxlength="1" data-index="3">
+                    <input type="text" class="otp-input" maxlength="1" data-index="4">
+                    <input type="text" class="otp-input" maxlength="1" data-index="5">
+                </div>
+                <span class="error-message" id="userOtpError">Invalid OTP. Please try again.</span>
+            </div>
+
+            <button class="submit-btn" id="userVerifyOtpBtn">Verify OTP</button>
+
+            <div class="resend-section">
+                Didn't receive OTP?
+                <a href="#" class="resend-btn disabled" id="userResendBtn">
+                    Resend in <span class="timer" id="userTimer">30</span>s
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/dashboard.js"></script>
+</body>
+</html>
