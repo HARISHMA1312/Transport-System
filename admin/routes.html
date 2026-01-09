@@ -20,16 +20,30 @@
 
     <div class="card route-card">
       <div class="route-form">
-        <input placeholder="Route Name">
-        <input placeholder="Stops (College → Stop1 → Stop2)">
-        <button class="btn-sm">Add Route</button>
+        <input id="routeName" placeholder="Route Name">
+        <input id="stopsInput" placeholder="Stops (separate with → or , )">
+        <div id="stopsEditor" style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;"></div>
+        <div style="margin-top:10px;">
+          <div style="display:flex; gap:8px; align-items:center;">
+            <label for="routeBuses" style="display:block; margin-bottom:6px; color:#333;">Assign Bus</label>
+            <button id="refreshBusesBtn" type="button" class="btn-sm" style="padding:6px 10px; margin-left:8px;">Refresh buses</button>
+          </div>
+          <select id="routeBuses" style="width:100%; padding:0.6rem; border-radius:8px; border:1px solid #ddd; background:white;">
+            <option value="" disabled selected>Select a bus</option>
+          </select>
+          <div id="routeBusesDebug" style="margin-top:6px; color:#666; font-size:0.9rem; white-space:pre-wrap;"></div>
+        </div>
+        <div style="margin-top:10px;">
+          <button type="button" id="addRouteBtn" class="btn-sm">Add Route</button>
+          <button type="button" id="cancelEditRouteBtn" class="btn-sm" style="display:none; margin-left:8px;">Cancel</button>
+        </div>
       </div>
 
-      <ul class="route-list">
-        <li>College → Thirunagar → Natraj Theatre</li>
-        <li>College → Crime Branch</li>
+      <ul id="routeList" class="route-list">
       </ul>
     </div>
+
+    <script src="../js/admin.js?v=3"></script>
 
   </div>
 

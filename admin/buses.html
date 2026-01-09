@@ -19,18 +19,19 @@
 
     <div class="card">
       <div class="form-row">
-        <input placeholder="Bus Number">
-        <input placeholder="Driver Name">
-        <input placeholder="Driver Phone">
+        <input id="busNo" placeholder="Bus Number">
+        <input id="driverName" placeholder="Driver Name">
+        <input id="driverPhone" placeholder="Driver Phone">
       </div>
 
       <div class="form-row">
-        <select>
+        <select id="busStatus">
           <option>Active</option>
           <option>Inactive</option>
         </select>
         <div class="actions">
-          <button class="btn-sm">Add Bus</button>
+          <button type="button" id="addBusBtn" class="btn-sm">Add Bus</button>
+          <button type="button" id="cancelEditBusBtn" class="btn-sm" style="display:none; margin-left:8px;">Cancel</button>
         </div>
       </div>
     </div>
@@ -44,14 +45,11 @@
     <th>Status</th>
     <th>Action</th>
   </tr>
-  <tr>
-    <td>TN 45 AB 1234</td>
-    <td>Ravi</td>
-    <td>Active</td>
-    <td><button>Delete</button></td>
-  </tr>
+  <tbody id="busesTbody">
+  </tbody>
     </table>
 
+    <script src="../js/admin.js?v=3"></script>
   </div>
 
 </body>

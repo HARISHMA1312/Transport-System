@@ -454,7 +454,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (profilePhoneInput) profilePhoneInput.value = userData.phone || '';
 
                 const busRouteSelect = document.getElementById('busRoute');
-                if (busRouteSelect) busRouteSelect.value = userData.busRoute || '';
+                        // Populate busRoute select from admin-managed routes (localStorage 'routes')
+                        if (busRouteSelect) {
+                            try {
+                                const routes = JSON.parse(localStorage.getItem('routes') || '[]');
+                                // clear existing dynamic options (keep placeholder)
+                                const placeholder = busRouteSelect.querySelector('option[value=""]');
+                                busRouteSelect.innerHTML = '';
+                                if (placeholder) busRouteSelect.appendChild(placeholder);
+                                routes.forEach((r, i) => {
+                                    const opt = document.createElement('option');
+                                    opt.value = r.name || `route_${i}`;
+                                    opt.textContent = r.name + (r.stops && r.stops.length ? ' (' + r.stops.join(' / ') + ')' : '');
+                                    busRouteSelect.appendChild(opt);
+                                });
+                            } catch (e) {
+                                // ignore parse errors
+                            }
+                            busRouteSelect.value = userData.busRoute || '';
+                        }
+
+                        // Render dashboard cards from admin-managed routes
+                        try {
+                            renderDashboardRoutes();
+                        } catch (e) {
+                            // ignore
+                        }
 
                 const departmentSelect = document.getElementById('department');
                 if (departmentSelect) departmentSelect.value = userData.department || '';
@@ -492,6 +517,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
             localStorage.setItem('userProfile', JSON.stringify(userData));
 
+            // Persist profile updates back into registered users list so admin view shows updated route/department
+            try {
+                const normalizePhone = (p) => { if (!p) return ''; const d = String(p).replace(/[^0-9]/g,''); return d.length>=10?'+91 '+d.slice(-10):p; };
+                const users = JSON.parse(localStorage.getItem('users') || '[]');
+                const idx = users.findIndex(u => normalizePhone(u.phone) === normalizePhone(userData.phone));
+                if (idx !== -1) {
+                    users[idx].name = name;
+                    users[idx].busRoute = busRoute;
+                    users[idx].department = department;
+                    localStorage.setItem('users', JSON.stringify(users));
+                } else {
+                    // fallback: update or create profiles array
+                    const profiles = JSON.parse(localStorage.getItem('profiles') || '[]');
+                    const pidx = profiles.findIndex(p => normalizePhone(p.phone) === normalizePhone(userData.phone));
+                    if (pidx !== -1) {
+                        profiles[pidx].name = name;
+                        profiles[pidx].busRoute = busRoute;
+                        profiles[pidx].department = department;
+                        localStorage.setItem('profiles', JSON.stringify(profiles));
+                    } else {
+                        profiles.push({ name, phone: normalizePhone(userData.phone), busRoute, department });
+                        localStorage.setItem('profiles', JSON.stringify(profiles));
+                    }
+                }
+            } catch (e) {
+                // ignore persistence errors
+            }
+
             const userNameDisplay = document.getElementById('userName');
             if (userNameDisplay) userNameDisplay.textContent = name;
 
@@ -510,4 +563,148 @@ window.handleGetStarted = function () {
 
 window.goToAdmin = function () {
     window.location.href = "admin/admin-login.html";
+}
+
+// Render admin-managed routes as dashboard cards
+function renderDashboardRoutes() {
+    const container = document.getElementById('busCardsContainer') || document.querySelector('.bus-cards-container');
+    if (!container) return;
+    container.innerHTML = '';
+    let routes = [];
+    try { routes = JSON.parse(localStorage.getItem('routes') || '[]'); } catch(e) { routes = []; }
+    console.log('renderDashboardRoutes: found routes count =', (routes && routes.length) || 0, routes);
+    if (!routes || routes.length === 0) {
+        // If no routes are present, auto-populate from a default set (provided by user)
+        const sample = [
+            { name: 'r1', stops: ['college','palanganatham','vasantha nagar','madura college','periyar','simmakal','goripalayam','vadamalayan','district court','maatuthavani'] },
+            { name: 'r2', stops: ['college','palanganatham','natraj theatre','by-pass road','duraisami nagar','guru theatre','arappalayam'] }
+        ];
+        try {
+            localStorage.setItem('routes', JSON.stringify(sample));
+            routes = sample;
+        } catch (e) {
+            container.innerHTML = '<div style="color:#666; padding:20px">No routes available and could not write sample routes to localStorage.</div>';
+            return;
+        }
+    }
+
+    routes.forEach((r, idx) => {
+        const card = document.createElement('div');
+        card.className = 'bus-card';
+
+        const header = document.createElement('div'); header.className = 'bus-header';
+        const h3 = document.createElement('h3'); h3.innerHTML = `<span>🚌</span> ${escapeHtml(r.name || ('Route ' + (idx+1)))}`;
+        const live = document.createElement('div'); live.className = 'live-indicator';
+        header.appendChild(h3); header.appendChild(live);
+
+        const mapWrap = document.createElement('div'); mapWrap.className = 'bus-map';
+        const mapPlaceholder = document.createElement('div'); mapPlaceholder.className = 'map-placeholder';
+
+        // create simple SVG route visualization: nodes + connecting line
+        const parseStopsLocal = (input) => { if (!input) return []; return String(input).split(/→|->|,|\|/).map(s=>s.trim()).filter(Boolean); };
+        const stops = Array.isArray(r.stops) ? r.stops : (typeof parseStops === 'function' ? parseStops(r.stops || '') : parseStopsLocal(r.stops || ''));
+        try {
+            const svgNS = 'http://www.w3.org/2000/svg';
+            const svg = document.createElementNS(svgNS, 'svg');
+            // Use a tall viewBox for vertical route rendering so circles at y~95 are visible
+            svg.setAttribute('viewBox', '0 0 20 100');
+            svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+            // Make svg narrow and tall so it looks like a vertical route line inside the map placeholder
+            svg.style.width = '44px';
+            svg.style.height = '90%';
+
+            if (stops.length > 0) {
+                // vertical line view: viewBox width small, height 100
+                const line = document.createElementNS(svgNS, 'line');
+                line.setAttribute('x1', 10);
+                line.setAttribute('y1', 5);
+                line.setAttribute('x2', 10);
+                line.setAttribute('y2', 95);
+                line.setAttribute('stroke', '#007acc');
+                line.setAttribute('stroke-width', '1.2');
+                svg.appendChild(line);
+
+                stops.forEach((s, i) => {
+                    const cy = (stops.length === 1) ? 50 : (5 + (i * (90 / (stops.length - 1))));
+                    const circle = document.createElementNS(svgNS, 'circle');
+                    circle.setAttribute('cx', 10);
+                    circle.setAttribute('cy', cy);
+                    // larger filled circles for start/end, hollow for intermediates
+                    if (i === 0) {
+                        circle.setAttribute('r', 3.8);
+                        circle.setAttribute('fill', '#0052cc');
+                    } else if (i === stops.length - 1) {
+                        circle.setAttribute('r', 3.8);
+                        circle.setAttribute('fill', '#5a2a8a');
+                    } else {
+                        circle.setAttribute('r', 2.8);
+                        circle.setAttribute('fill', '#ffffff');
+                        circle.setAttribute('stroke', '#007acc');
+                        circle.setAttribute('stroke-width', '1');
+                    }
+                    const title = document.createElementNS(svgNS, 'title');
+                    title.textContent = s;
+                    circle.appendChild(title);
+                    svg.appendChild(circle);
+                });
+            } else {
+                const text = document.createElement('div');
+                text.textContent = '📍 Map View';
+                mapPlaceholder.appendChild(text);
+            }
+
+            mapPlaceholder.appendChild(svg);
+        } catch (e) {
+            mapPlaceholder.textContent = '📍 Map View';
+        }
+
+        mapWrap.appendChild(mapPlaceholder);
+
+        const info = document.createElement('div'); info.className = 'bus-info';
+        const infoRow = document.createElement('div'); infoRow.className = 'info-row';
+        const label = document.createElement('span'); label.className = 'info-label'; label.textContent = 'Route:';
+        const busNumber = document.createElement('span'); busNumber.className = 'bus-number'; busNumber.textContent = r.name || ('Route ' + (idx+1));
+        infoRow.appendChild(label); infoRow.appendChild(busNumber);
+
+        const routeDetails = document.createElement('div'); routeDetails.className = 'route-details';
+        const routeHeader = document.createElement('div'); routeHeader.className = 'route-header'; routeHeader.textContent = '🗺️ Route';
+        const routeList = document.createElement('div'); routeList.className = 'route-list';
+
+        // reuse `stops` declared earlier for SVG rendering
+        const start = stops[0] || '';
+        const end = stops.length ? stops[stops.length-1] : '';
+
+        const startDiv = document.createElement('div'); startDiv.className = 'route-point start'; startDiv.innerHTML = `<strong>Start:</strong> ${escapeHtml(start)}`;
+        routeList.appendChild(startDiv);
+
+        // intermediate stops (hidden by default)
+        const intermediateContainer = document.createElement('div'); intermediateContainer.style.display = 'none';
+        intermediateContainer.style.flexDirection = 'column';
+        intermediateContainer.style.marginTop = '6px';
+        for (let i = 1; i < stops.length-1; i++) {
+            const sdiv = document.createElement('div'); sdiv.className = 'route-point'; sdiv.textContent = stops[i];
+            intermediateContainer.appendChild(sdiv);
+        }
+        routeList.appendChild(intermediateContainer);
+
+        const endDiv = document.createElement('div'); endDiv.className = 'route-point end'; endDiv.innerHTML = `<strong>End:</strong> ${escapeHtml(end)}`;
+        routeList.appendChild(endDiv);
+
+        routeDetails.appendChild(routeHeader); routeDetails.appendChild(routeList);
+        info.appendChild(infoRow); info.appendChild(routeDetails);
+
+        card.appendChild(header); card.appendChild(mapWrap); card.appendChild(info);
+        container.appendChild(card);
+
+        // hover to show intermediate stops; click to toggle persistent expand
+        let expanded = false;
+        card.addEventListener('mouseenter', () => { if (!expanded) intermediateContainer.style.display = (intermediateContainer.children.length? 'block':'none'); });
+        card.addEventListener('mouseleave', () => { if (!expanded) intermediateContainer.style.display = 'none'; });
+        card.addEventListener('click', (e) => {
+            // ignore clicks on buttons/inputs if any
+            if (e.target && e.target.tagName.toLowerCase() === 'button') return;
+            expanded = !expanded;
+            intermediateContainer.style.display = expanded ? (intermediateContainer.children.length? 'block':'none') : 'none';
+        });
+    });
 }
