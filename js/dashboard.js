@@ -454,35 +454,51 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (profilePhoneInput) profilePhoneInput.value = userData.phone || '';
 
                 const busRouteSelect = document.getElementById('busRoute');
-                        // Populate busRoute select from admin-managed routes (localStorage 'routes')
-                        if (busRouteSelect) {
-                            try {
-                                const routes = JSON.parse(localStorage.getItem('routes') || '[]');
-                                // clear existing dynamic options (keep placeholder)
-                                const placeholder = busRouteSelect.querySelector('option[value=""]');
-                                busRouteSelect.innerHTML = '';
-                                if (placeholder) busRouteSelect.appendChild(placeholder);
-                                routes.forEach((r, i) => {
-                                    const opt = document.createElement('option');
-                                    opt.value = r.name || `route_${i}`;
-                                    opt.textContent = r.name + (r.stops && r.stops.length ? ' (' + r.stops.join(' / ') + ')' : '');
-                                    busRouteSelect.appendChild(opt);
-                                });
-                            } catch (e) {
-                                // ignore parse errors
-                            }
-                            busRouteSelect.value = userData.busRoute || '';
-                        }
+                // Populate busRoute select from admin-managed routes (localStorage 'routes')
+                if (busRouteSelect) {
+                    try {
+                        const routes = JSON.parse(localStorage.getItem('routes') || '[]');
+                        // clear existing dynamic options (keep placeholder)
+                        const placeholder = busRouteSelect.querySelector('option[value=""]');
+                        busRouteSelect.innerHTML = '';
+                        if (placeholder) busRouteSelect.appendChild(placeholder);
+                        routes.forEach((r, i) => {
+                            const opt = document.createElement('option');
+                            opt.value = r.name || `route_${i}`;
+                            opt.textContent = r.name + (r.stops && r.stops.length ? ' (' + r.stops.join(' / ') + ')' : '');
+                            busRouteSelect.appendChild(opt);
+                        });
+                    } catch (e) {
+                        // ignore parse errors
+                    }
+                    busRouteSelect.value = userData.busRoute || '';
+                }
 
-                        // Render dashboard cards from admin-managed routes
-                        try {
-                            renderDashboardRoutes();
-                        } catch (e) {
-                            // ignore
-                        }
+                // Render dashboard cards from admin-managed routes
+                try {
+                    renderDashboardRoutes();
+                } catch (e) {
+                    // ignore
+                }
 
                 const departmentSelect = document.getElementById('department');
                 if (departmentSelect) departmentSelect.value = userData.department || '';
+
+                const searchBar = document.getElementById('searchBar');
+                const searchCriteria = document.getElementById('searchCriteria');
+
+                if (searchBar) {
+                    searchBar.addEventListener('input', (e) => {
+                        renderDashboardRoutes(e.target.value);
+                    });
+                }
+
+                if (searchCriteria) {
+                    searchCriteria.addEventListener('change', () => {
+                        const searchText = searchBar ? searchBar.value : '';
+                        renderDashboardRoutes(searchText);
+                    });
+                }
             } else {
                 alert('Please login first');
             }
@@ -519,7 +535,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Persist profile updates back into registered users list so admin view shows updated route/department
             try {
-                const normalizePhone = (p) => { if (!p) return ''; const d = String(p).replace(/[^0-9]/g,''); return d.length>=10?'+91 '+d.slice(-10):p; };
+                const normalizePhone = (p) => { if (!p) return ''; const d = String(p).replace(/[^0-9]/g, ''); return d.length >= 10 ? '+91 ' + d.slice(-10) : p; };
                 const users = JSON.parse(localStorage.getItem('users') || '[]');
                 const idx = users.findIndex(u => normalizePhone(u.phone) === normalizePhone(userData.phone));
                 if (idx !== -1) {
@@ -565,146 +581,264 @@ window.goToAdmin = function () {
     window.location.href = "admin/admin-login.html";
 }
 
+// Helper to prevent XSS
+function escapeHtml(text) {
+    if (!text) return text;
+    return String(text).replace(/[&<>"']/g, function (m) {
+        return {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        }[m];
+    });
+}
+
 // Render admin-managed routes as dashboard cards
-function renderDashboardRoutes() {
+function renderDashboardRoutes(filterText = '') {
     const container = document.getElementById('busCardsContainer') || document.querySelector('.bus-cards-container');
     if (!container) return;
     container.innerHTML = '';
+
     let routes = [];
-    try { routes = JSON.parse(localStorage.getItem('routes') || '[]'); } catch(e) { routes = []; }
-    console.log('renderDashboardRoutes: found routes count =', (routes && routes.length) || 0, routes);
+    try { routes = JSON.parse(localStorage.getItem('routes') || '[]'); } catch (e) { routes = []; }
+    let allBuses = [];
+    try { allBuses = JSON.parse(localStorage.getItem('buses') || '[]'); } catch (e) { allBuses = []; }
+
+    console.log('renderDashboardRoutes: found routes count =', (routes && routes.length) || 0);
+
     if (!routes || routes.length === 0) {
-        // If no routes are present, auto-populate from a default set (provided by user)
-        const sample = [
-            { name: 'r1', stops: ['college','palanganatham','vasantha nagar','madura college','periyar','simmakal','goripalayam','vadamalayan','district court','maatuthavani'] },
-            { name: 'r2', stops: ['college','palanganatham','natraj theatre','by-pass road','duraisami nagar','guru theatre','arappalayam'] }
-        ];
-        try {
-            localStorage.setItem('routes', JSON.stringify(sample));
-            routes = sample;
-        } catch (e) {
-            container.innerHTML = '<div style="color:#666; padding:20px">No routes available and could not write sample routes to localStorage.</div>';
-            return;
-        }
+        container.innerHTML = '<div style="color:#666; padding:20px; text-align:center;">No routes available at the moment.</div>';
+        return;
     }
 
-    routes.forEach((r, idx) => {
+    // Get current criteria
+    const criteriaSelect = document.getElementById('searchCriteria');
+    const criteria = criteriaSelect ? criteriaSelect.value : 'all';
+
+    // Filter routes based on search text and criteria
+    const searchText = filterText.toLowerCase().trim();
+    const filteredRoutes = routes.filter(r => {
+        if (!searchText) return true;
+
+        const matchRoute = (r.name || '').toLowerCase().includes(searchText);
+
+        const assignedBuses = allBuses.filter(b => (r.buses || []).includes(b.busNo));
+        const matchBus = assignedBuses.some(b => (b.busNo || '').toLowerCase().includes(searchText));
+
+        const stopsStr = Array.isArray(r.stops) ? r.stops.join(' ') : String(r.stops || '');
+        const matchStop = stopsStr.toLowerCase().includes(searchText);
+
+        if (criteria === 'route') return matchRoute;
+        if (criteria === 'bus') return matchBus;
+        if (criteria === 'stop') return matchStop;
+
+        // Default 'all'
+        return matchRoute || matchBus || matchStop;
+    });
+
+    if (filteredRoutes.length === 0) {
+        container.innerHTML = `<div style="color:#666; padding:20px; text-align:center;">No routes found matching "${escapeHtml(filterText)}" (${criteria})</div>`;
+        return;
+    }
+
+    filteredRoutes.forEach((r, idx) => {
         const card = document.createElement('div');
         card.className = 'bus-card';
 
+        // --- Find assigned buses ---
+        // r.buses is an array of busNo strings
+        const assignedBuses = allBuses.filter(b => (r.buses || []).includes(b.busNo));
+
+        let busDetailsHtml = '';
+        if (assignedBuses.length > 0) {
+            busDetailsHtml = assignedBuses.map(b =>
+                `<div><strong>${escapeHtml(b.busNo)}</strong> <span style="font-size:0.9em; color:#666">(${escapeHtml(b.driverName || 'No Driver')})</span></div>`
+            ).join('');
+        } else {
+            busDetailsHtml = '<div>No bus assigned</div>';
+        }
+
         const header = document.createElement('div'); header.className = 'bus-header';
-        const h3 = document.createElement('h3'); h3.innerHTML = `<span>🚌</span> ${escapeHtml(r.name || ('Route ' + (idx+1)))}`;
+        // Bus Number in header? or Route Name? User asked for "bus number and respective phone number" in the full view.
+        // Let's put Route Name in header.
+        const h3 = document.createElement('h3');
+        h3.innerHTML = `<span>🚌</span> ${escapeHtml(r.name || ('Route ' + (idx + 1)))}`;
         const live = document.createElement('div'); live.className = 'live-indicator';
         header.appendChild(h3); header.appendChild(live);
 
         const mapWrap = document.createElement('div'); mapWrap.className = 'bus-map';
-        const mapPlaceholder = document.createElement('div'); mapPlaceholder.className = 'map-placeholder';
 
-        // create simple SVG route visualization: nodes + connecting line
-        const parseStopsLocal = (input) => { if (!input) return []; return String(input).split(/→|->|,|\|/).map(s=>s.trim()).filter(Boolean); };
-        const stops = Array.isArray(r.stops) ? r.stops : (typeof parseStops === 'function' ? parseStops(r.stops || '') : parseStopsLocal(r.stops || ''));
-        try {
-            const svgNS = 'http://www.w3.org/2000/svg';
-            const svg = document.createElementNS(svgNS, 'svg');
-            // Use a tall viewBox for vertical route rendering so circles at y~95 are visible
-            svg.setAttribute('viewBox', '0 0 20 100');
-            svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-            // Make svg narrow and tall so it looks like a vertical route line inside the map placeholder
-            svg.style.width = '44px';
-            svg.style.height = '90%';
+        // --- Prepare Stops (moved up for map query) ---
+        const parseStopsLocal = (input) => { if (!input) return []; return String(input).split(/→|->|,|\|/).map(s => s.trim()).filter(Boolean); };
+        const stops = Array.isArray(r.stops) ? r.stops : parseStopsLocal(r.stops || '');
 
-            if (stops.length > 0) {
-                // vertical line view: viewBox width small, height 100
-                const line = document.createElementNS(svgNS, 'line');
-                line.setAttribute('x1', 10);
-                line.setAttribute('y1', 5);
-                line.setAttribute('x2', 10);
-                line.setAttribute('y2', 95);
-                line.setAttribute('stroke', '#007acc');
-                line.setAttribute('stroke-width', '1.2');
-                svg.appendChild(line);
+        // Google Map Component (Iframe)
+        const iframe = document.createElement('iframe');
+        iframe.style.width = '100%';
+        iframe.style.height = '100%';
+        iframe.style.border = '0';
+        iframe.loading = 'lazy';
+        iframe.allowFullscreen = true;
 
-                stops.forEach((s, i) => {
-                    const cy = (stops.length === 1) ? 50 : (5 + (i * (90 / (stops.length - 1))));
-                    const circle = document.createElementNS(svgNS, 'circle');
-                    circle.setAttribute('cx', 10);
-                    circle.setAttribute('cy', cy);
-                    // larger filled circles for start/end, hollow for intermediates
-                    if (i === 0) {
-                        circle.setAttribute('r', 3.8);
-                        circle.setAttribute('fill', '#0052cc');
-                    } else if (i === stops.length - 1) {
-                        circle.setAttribute('r', 3.8);
-                        circle.setAttribute('fill', '#5a2a8a');
-                    } else {
-                        circle.setAttribute('r', 2.8);
-                        circle.setAttribute('fill', '#ffffff');
-                        circle.setAttribute('stroke', '#007acc');
-                        circle.setAttribute('stroke-width', '1');
-                    }
-                    const title = document.createElementNS(svgNS, 'title');
-                    title.textContent = s;
-                    circle.appendChild(title);
-                    svg.appendChild(circle);
-                });
-            } else {
-                const text = document.createElement('div');
-                text.textContent = '📍 Map View';
-                mapPlaceholder.appendChild(text);
+        // Use the first stop as the query location, or fallback to 'Madurai, Tamil Nadu'
+        const locationQuery = (stops.length > 0) ? stops[0] : 'Madurai, Tamil Nadu';
+        iframe.src = `https://maps.google.com/maps?q=${encodeURIComponent(locationQuery)}&t=&z=13&ie=UTF8&iwloc=&output=embed`;
+
+        mapWrap.appendChild(iframe);
+
+        // Note: SVG/Image placeholder removed in favor of GMap iframe.
+
+        // Note: SVG visualization removed in favor of static Google Map image as requested.
+
+
+        // --- Info Section ---
+        const info = document.createElement('div'); info.className = 'bus-info';
+
+        // Summary View (Always Visible)
+        // "then source and destination stop and then 2 intermediate stops"
+        const summaryDiv = document.createElement('div');
+        summaryDiv.className = 'route-summary';
+
+        if (stops.length > 0) {
+            const start = stops[0];
+            const end = stops[stops.length - 1];
+            // Pick up to 2 intermediate stops
+            let intermediates = [];
+            if (stops.length > 2) {
+                // If we have just 1 intermediate (len=3), take it.
+                // If we have many, pick 2 reasonably spaced? or just next 2?
+                // "then 2 intermediate stops"
+                if (stops.length === 3) intermediates.push(stops[1]);
+                else if (stops.length >= 4) {
+                    intermediates.push(stops[1]);
+                    intermediates.push(stops[2]);
+                    // or maybe middle ones? Let's stick to first 2 after start for consistency
+                }
             }
 
-            mapPlaceholder.appendChild(svg);
-        } catch (e) {
-            mapPlaceholder.textContent = '📍 Map View';
+            let summaryHtml = `<div style="margin-bottom:4px"><strong>Start:</strong> ${escapeHtml(start)}</div>`;
+            if (intermediates.length > 0) {
+                intermediates.forEach(s => {
+                    summaryHtml += `<div style="margin-bottom:4px; color:#666; font-size:0.9em; padding-left:8px;">↓ ${escapeHtml(s)}</div>`;
+                });
+            }
+            if (stops.length > 4) {
+                summaryHtml += `<div style="margin-bottom:4px; color:#999; font-size:0.8em; padding-left:12px;">... (+${stops.length - 4} more) ...</div>`;
+            }
+            summaryHtml += `<div><strong>End:</strong> ${escapeHtml(end)}</div>`;
+            summaryDiv.innerHTML = summaryHtml;
+        } else {
+            summaryDiv.innerHTML = '<em>No stops defined</em>';
         }
+        info.appendChild(summaryDiv);
 
-        mapWrap.appendChild(mapPlaceholder);
+        // --- Details Section (Hidden by default, shown on hover/click) ---
+        const detailsDiv = document.createElement('div');
+        detailsDiv.className = 'route-details-full';
+        detailsDiv.style.display = 'none';
+        detailsDiv.style.marginTop = '15px';
+        detailsDiv.style.paddingTop = '10px';
+        detailsDiv.style.borderTop = '1px solid #eee';
 
-        const info = document.createElement('div'); info.className = 'bus-info';
-        const infoRow = document.createElement('div'); infoRow.className = 'info-row';
-        const label = document.createElement('span'); label.className = 'info-label'; label.textContent = 'Route:';
-        const busNumber = document.createElement('span'); busNumber.className = 'bus-number'; busNumber.textContent = r.name || ('Route ' + (idx+1));
-        infoRow.appendChild(label); infoRow.appendChild(busNumber);
+        // Bus Info
+        const busInfoDiv = document.createElement('div');
+        busInfoDiv.style.marginBottom = '10px';
+        busInfoDiv.style.background = '#f9f9f9';
+        busInfoDiv.style.padding = '8px';
+        busInfoDiv.style.borderRadius = '8px';
+        busInfoDiv.innerHTML = `<h4 style="margin:0 0 5px 0; font-size:0.95rem; color:#444;">Bus Details</h4>` + busDetailsHtml;
+        detailsDiv.appendChild(busInfoDiv);
 
-        const routeDetails = document.createElement('div'); routeDetails.className = 'route-details';
-        const routeHeader = document.createElement('div'); routeHeader.className = 'route-header'; routeHeader.textContent = '🗺️ Route';
-        const routeList = document.createElement('div'); routeList.className = 'route-list';
+        // Full Route List
+        const fullRouteDiv = document.createElement('div');
+        fullRouteDiv.innerHTML = `<h4 style="margin:0 0 10px 0; font-size:0.95rem; color:#444;">Full Route</h4>`;
+        const list = document.createElement('div');
+        list.style.display = 'flex';
+        list.style.flexDirection = 'column';
+        list.style.marginLeft = '10px';
+        list.style.borderLeft = '2px dotted #aaa'; // Dotted line effect
+        list.style.paddingLeft = '15px';
 
-        // reuse `stops` declared earlier for SVG rendering
-        const start = stops[0] || '';
-        const end = stops.length ? stops[stops.length-1] : '';
+        stops.forEach((s, i) => {
+            const item = document.createElement('div');
+            item.style.position = 'relative';
+            item.style.marginBottom = '8px';
+            item.style.fontSize = '0.9rem';
+            item.style.color = (i === 0 || i === stops.length - 1) ? '#000' : '#555';
+            item.style.fontWeight = (i === 0 || i === stops.length - 1) ? 'bold' : 'normal';
 
-        const startDiv = document.createElement('div'); startDiv.className = 'route-point start'; startDiv.innerHTML = `<strong>Start:</strong> ${escapeHtml(start)}`;
-        routeList.appendChild(startDiv);
+            // Bullet point
+            const dot = document.createElement('div');
+            dot.style.position = 'absolute';
+            dot.style.left = '-21px'; // adjust based on padding and border width
+            dot.style.top = '6px';
+            dot.style.width = '10px';
+            dot.style.height = '10px';
+            dot.style.borderRadius = '50%';
+            dot.style.background = (i === 0 || i === stops.length - 1) ? '#667eea' : '#fff';
+            dot.style.border = '2px solid #667eea';
 
-        // intermediate stops (hidden by default)
-        const intermediateContainer = document.createElement('div'); intermediateContainer.style.display = 'none';
-        intermediateContainer.style.flexDirection = 'column';
-        intermediateContainer.style.marginTop = '6px';
-        for (let i = 1; i < stops.length-1; i++) {
-            const sdiv = document.createElement('div'); sdiv.className = 'route-point'; sdiv.textContent = stops[i];
-            intermediateContainer.appendChild(sdiv);
-        }
-        routeList.appendChild(intermediateContainer);
+            item.appendChild(dot);
+            item.appendChild(document.createTextNode(s));
+            list.appendChild(item);
+        });
+        fullRouteDiv.appendChild(list);
+        detailsDiv.appendChild(fullRouteDiv);
 
-        const endDiv = document.createElement('div'); endDiv.className = 'route-point end'; endDiv.innerHTML = `<strong>End:</strong> ${escapeHtml(end)}`;
-        routeList.appendChild(endDiv);
-
-        routeDetails.appendChild(routeHeader); routeDetails.appendChild(routeList);
-        info.appendChild(infoRow); info.appendChild(routeDetails);
+        info.appendChild(detailsDiv);
 
         card.appendChild(header); card.appendChild(mapWrap); card.appendChild(info);
         container.appendChild(card);
 
-        // hover to show intermediate stops; click to toggle persistent expand
-        let expanded = false;
-        card.addEventListener('mouseenter', () => { if (!expanded) intermediateContainer.style.display = (intermediateContainer.children.length? 'block':'none'); });
-        card.addEventListener('mouseleave', () => { if (!expanded) intermediateContainer.style.display = 'none'; });
+        // Interaction Logic
+        // "pop up on hovering and can also be clicked"
+        // "only when the user hover and click on the specific card the full route will be displayed"
+
+        // This likely means:
+        // Hover -> Show details
+        // Click -> Toggle details (persistent) or maybe link to track page?
+        // User said "click on the specific card the full route will be displayed", usually means expanding the card.
+
+        let isExpanded = false;
+
+        const expand = () => {
+            detailsDiv.style.display = 'block';
+            mapWrap.style.height = '100px'; // shrink map slightly or keep same?
+            // animate height?
+        };
+        const collapse = () => {
+            if (!isExpanded) {
+                detailsDiv.style.display = 'none';
+                mapWrap.style.height = '200px';
+            }
+        };
+
+        card.addEventListener('mouseenter', expand);
+        card.addEventListener('mouseleave', collapse);
+
         card.addEventListener('click', (e) => {
-            // ignore clicks on buttons/inputs if any
-            if (e.target && e.target.tagName.toLowerCase() === 'button') return;
-            expanded = !expanded;
-            intermediateContainer.style.display = expanded ? (intermediateContainer.children.length? 'block':'none') : 'none';
+            // Don't trigger if clicked on interactives if we had any
+            isExpanded = !isExpanded;
+            if (isExpanded) {
+                expand();
+                card.style.transform = 'scale(1.02)';
+                card.style.zIndex = '10';
+            } else {
+                card.style.transform = '';
+                card.style.zIndex = '1';
+                // If mouse is still over, remain expanded?
+                // Standard behavior: click toggles "locked open" state
+            }
         });
     });
 }
+
+// Auto-update dashboard when admin makes changes in another tab
+window.addEventListener('storage', function (e) {
+    if (e.key === 'routes' || e.key === 'buses') {
+        console.log('Data changed, refreshing dashboard routes...');
+        renderDashboardRoutes();
+    }
+});

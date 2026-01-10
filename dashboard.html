@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="css/dashboard.css">
-    
+
     <title>BusTrack - Dashboard</title>
 </head>
 
@@ -30,13 +30,20 @@
         </div>
 
         <!-- Search Bar -->
-        <div class="search-section">
-            <input type="text" class="search-bar" placeholder="Search for bus routes or stops..." id="searchBar">
+        <div class="search-section" style="display: flex; gap: 1rem;">
+            <select id="searchCriteria"
+                style="width: auto; padding: 0 1.5rem; border-radius: 15px; border: none; box-shadow: 0 4px 20px rgba(0,0,0,0.1); outline: none; background-color: white; cursor: pointer;">
+                <option value="all">All</option>
+                <option value="route">Route Name</option>
+                <option value="bus">Bus Number</option>
+                <option value="stop">Stop Name</option>
+            </select>
+            <input type="text" class="search-bar" placeholder="Search..." id="searchBar">
         </div>
 
         <!-- Bus Cards Container (dynamically rendered from admin routes) -->
         <div class="bus-cards-container" id="busCardsContainer">
-          <!-- dynamically generated cards will appear here -->
+            <!-- dynamically generated cards will appear here -->
         </div>
     </div>
 
