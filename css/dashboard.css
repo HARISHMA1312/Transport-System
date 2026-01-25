@@ -258,8 +258,9 @@ body {
     left: 8px;
     top: 10px;
     bottom: 10px;
-    width: 2px;
-    background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+    width: 0;
+    border-left: 2px dotted #667eea;
+    /* Dotted line */
 }
 
 .route-point {
