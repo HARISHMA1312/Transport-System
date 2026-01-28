@@ -5,10 +5,15 @@ function adminLogin() {
   if (user === "admin" && pass === "admin123") {
     window.location.href = "admin-dashboard.html";
 
-  } else {
     document.getElementById("error").innerText = "Invalid admin credentials";
   }
 }
+
+// --- Live Tracking Setup ---
+let socket;
+try { socket = io(); } catch (e) { console.log('Socket not available on this page'); }
+let trackingWatchId = null;
+let activeTrackingBusNo = null;
 
 // --- Buses and Routes Management (localStorage-backed) ---
 
@@ -21,7 +26,31 @@ function loadBuses() {
 
 function saveBuses(buses) {
   localStorage.setItem('buses', JSON.stringify(buses));
+  syncDataToServer();
 }
+
+function saveRoutes(routes) {
+  localStorage.setItem('routes', JSON.stringify(routes));
+  syncDataToServer();
+}
+
+// Sync local data to server (Source of Truth -> Server)
+function syncDataToServer() {
+  const routes = loadRoutes();
+  const buses = loadBuses();
+
+  fetch('/api/data', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ routes, buses })
+  }).then(res => res.json())
+    .then(d => console.log('Data synced to server'))
+    .catch(e => console.error('Sync failed', e));
+}
+// Initial sync on load to ensure server has latest admin data
+document.addEventListener('DOMContentLoaded', () => { // We'll add this call inside existing listener or here
+  setTimeout(syncDataToServer, 1000);
+});
 
 function renderAdminStats(tries = 5) {
   const busCountEl = document.getElementById('busCount');
@@ -55,16 +84,23 @@ function renderAdminStats(tries = 5) {
   if (userEl) userEl.textContent = userCount;
   if (routeEl) routeEl.textContent = routes.length;
 }
-
 function renderBuses() {
   const tbody = document.getElementById('busesTbody');
   if (!tbody) return;
   const buses = loadBuses();
   tbody.innerHTML = '';
   buses.forEach((b, idx) => {
+    const isTracking = (activeTrackingBusNo === b.busNo);
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${escapeHtml(b.busNo)}</td>
       <td>${escapeHtml(b.driverName)}<br><small>${escapeHtml(b.driverPhone)}</small></td>
+      <td>
+        <label class="switch">
+          <input type="checkbox" ${isTracking ? 'checked' : ''} onchange="toggleBusTracking(${idx}, this.checked)">
+          <span class="slider round"></span>
+        </label>
+        <span style="font-size:12px; margin-left:5px;">${isTracking ? 'Live' : 'Off'}</span>
+      </td>
       <td>${escapeHtml(b.status)}</td>
       <td>
         <button type="button" data-action="edit" data-index="${idx}">Edit</button>
@@ -126,14 +162,96 @@ function deleteBus(index) {
   saveBuses(buses);
   renderBuses();
   renderAdminStats();
+  renderAdminStats();
 }
+
+function findRouteForBus(busNo) {
+  const routes = loadRoutes();
+  // Case-insensitive search for busNo in route.buses array
+  return routes.find(r =>
+    (r.buses || []).some(b => String(b).trim().toLowerCase() === String(busNo).trim().toLowerCase())
+  );
+}
+
+window.toggleBusTracking = function (index, isChecked) {
+  const buses = loadBuses();
+  const bus = buses[index];
+  if (!bus) return;
+
+  if (isChecked) {
+    // 1. Check if another bus is already tracking on THIS laptop
+    if (activeTrackingBusNo && activeTrackingBusNo !== bus.busNo) {
+      alert(`You are already simulating Bus ${activeTrackingBusNo}. Only one bus can be simulated per device.`);
+      renderBuses(); // Revert toggle
+      return;
+    }
+
+    // 2. Find Route
+    const route = findRouteForBus(bus.busNo);
+    if (!route) {
+      alert(`Bus ${bus.busNo} is not assigned to any route! Please assign it in 'Manage Routes' first.`);
+      renderBuses();
+      return;
+    }
+
+    // 3. Start Tracking
+    if (!navigator.geolocation) {
+      alert("Geolocation not supported on this device.");
+      renderBuses();
+      return;
+    }
+
+    activeTrackingBusNo = bus.busNo;
+    console.log(`Starting tracking for ${bus.busNo} on route ${route.name}`);
+
+    // Notify server
+    socket.emit('join-bus-room', route.name);
+
+    trackingWatchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { latitude, longitude, speed } = pos.coords;
+        socket.emit('update-bus-location', {
+          routeId: route.name, // Send updates to this route room
+          lat: latitude,
+          lng: longitude,
+          speed: speed
+        });
+      },
+      (err) => {
+        console.error("GPS Error:", err);
+        alert("GPS Error: " + err.message);
+        // Turn off if GPS fails
+        activeTrackingBusNo = null;
+        renderBuses();
+      },
+      { enableHighAccuracy: true }
+    );
+
+  } else {
+    // Stop Tracking
+    if (activeTrackingBusNo === bus.busNo) {
+      if (trackingWatchId) {
+        navigator.geolocation.clearWatch(trackingWatchId);
+        trackingWatchId = null;
+      }
+
+      const route = findRouteForBus(bus.busNo);
+      if (route) {
+        socket.emit('stop-tracking', route.name);
+      }
+
+      activeTrackingBusNo = null;
+    }
+  }
+  renderBuses();
+};
 
 // Routes: { name, stops: [] }
 function loadRoutes() {
   try { return JSON.parse(localStorage.getItem('routes') || '[]'); } catch (e) { return []; }
 }
 
-function saveRoutes(routes) { localStorage.setItem('routes', JSON.stringify(routes)); }
+// function saveRoutes(routes) { localStorage.setItem('routes', JSON.stringify(routes)); } // Removed, defined at top
 
 function parseStops(input) {
   if (!input) return [];
@@ -577,8 +695,8 @@ async function searchAndShowLocation() {
   // Show map and instruction
   document.getElementById('map').classList.add('active');
   setTimeout(() => {
-  map.invalidateSize();
-}, 200);
+    map.invalidateSize();
+  }, 200);
 
   document.getElementById('mapInstruction').classList.add('active');
 

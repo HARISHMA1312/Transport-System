@@ -1,10 +1,13 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <title>Bus Management</title>
- <link rel="stylesheet" href="../css/admin-common.css?v=2">
- <link rel="stylesheet" href="../css/admin-buses.css?v=2">
+  <link rel="stylesheet" href="../css/admin-common.css?v=2">
+  <link rel="stylesheet" href="../css/admin-buses.css?v=2">
+  <link rel="stylesheet" href="../css/admin-switch.css">
 </head>
+
 <body>
   <div class="header">
     <div class="app-name"><span class="app-icon">🚌</span> Transport Admin</div>
@@ -31,7 +34,8 @@
         </select>
         <div class="actions">
           <button type="button" id="addBusBtn" class="btn-sm">Add Bus</button>
-          <button type="button" id="cancelEditBusBtn" class="btn-sm" style="display:none; margin-left:8px;">Cancel</button>
+          <button type="button" id="cancelEditBusBtn" class="btn-sm"
+            style="display:none; margin-left:8px;">Cancel</button>
         </div>
       </div>
     </div>
@@ -39,18 +43,21 @@
     <hr>
 
     <table>
-  <tr>
-    <th>Bus No</th>
-    <th>Driver</th>
-    <th>Status</th>
-    <th>Action</th>
-  </tr>
-  <tbody id="busesTbody">
-  </tbody>
+      <tr>
+        <th>Bus No</th>
+        <th>Driver</th>
+        <th>Tracking</th>
+        <th>Status</th>
+        <th>Action</th>
+      </tr>
+      <tbody id="busesTbody">
+      </tbody>
     </table>
 
+    <script src="/socket.io/socket.io.js"></script>
     <script src="../js/admin.js?v=3"></script>
   </div>
 
 </body>
+
 </html>

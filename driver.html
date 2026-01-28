@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bus Driver - Tracking</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        h1 {
+            margin-top: 0;
+            color: #1a1a1a;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ccc;
+            margin-right: 8px;
+        }
+
+        .status-indicator.active {
+            background: #22c55e;
+            box-shadow: 0 0 10px #22c55e;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #4b5563;
+            font-weight: 500;
+        }
+
+        select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        button {
+            width: 100%;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-start {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .btn-start:hover {
+            background: #2563eb;
+        }
+
+        .btn-stop {
+            background: #ef4444;
+            color: white;
+            display: none;
+        }
+
+        .btn-stop:hover {
+            background: #dc2626;
+        }
+
+        .info {
+            margin-top: 1rem;
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🚍 Driver Portal</h1>
+
+        <div class="form-group" id="routeSelectGroup">
+            <label for="routeSelect">Enter Route Name (e.g., r1)</label>
+            <input type="text" id="routeSelect" placeholder="Enter Route Name matching Dashboard"
+                style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 1rem;">
+        </div>
+
+        <button id="startBtn" class="btn-start">Start Tracking</button>
+        <button id="stopBtn" class="btn-stop">Stop Tracking</button>
+
+        <div class="info">
+            <span class="status-indicator" id="statusDot"></span>
+            <span id="statusText">Not tracking</span>
+        </div>
+        <div id="stats" class="info" style="display:none; margin-top:0.5rem;">
+            Updates sent: <span id="updateCount">0</span>
+        </div>
+    </div>
+
+    <!-- Socket.io -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let watchId = null;
+        let updateCount = 0;
+
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const updateCountEl = document.getElementById('updateCount');
+        const routeSelect = document.getElementById('routeSelect');
+        const routeSelectGroup = document.getElementById('routeSelectGroup');
+
+        startBtn.addEventListener('click', () => {
+            if (!navigator.geolocation) {
+                alert('Geolocation is not supported by your browser');
+                return;
+            }
+
+            const routeId = routeSelect.value;
+            statusText.textContent = 'Requesting GPS access...';
+
+            watchId = navigator.geolocation.watchPosition(
+                (position) => {
+                    const { latitude, longitude, heading, speed } = position.coords;
+
+                    socket.emit('update-bus-location', {
+                        routeId: routeId,
+                        lat: latitude,
+                        lng: longitude,
+                        heading: heading,
+                        speed: speed
+                    });
+
+                    updateCount++;
+                    updateCountEl.textContent = updateCount;
+
+                    // UI Updates
+                    statusDot.classList.add('active');
+                    statusText.textContent = `Tracking Active (${routeId})`;
+                    document.getElementById('stats').style.display = 'block';
+                    startBtn.style.display = 'none';
+                    stopBtn.style.display = 'block';
+                    routeSelectGroup.style.display = 'none'; // Lock selection
+                },
+                (error) => {
+                    console.error('Error getting location', error);
+                    statusText.textContent = 'GPS Error: ' + error.message;
+                },
+                {
+                    enableHighAccuracy: true,
+                    maximumAge: 0,
+                    timeout: 5000
+                }
+            );
+        });
+
+        stopBtn.addEventListener('click', () => {
+            if (watchId !== null) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+
+            // Notify server that tracking has stopped
+            const routeId = routeSelect.value;
+            if (routeId) {
+                socket.emit('stop-tracking', routeId);
+            }
+
+            statusDot.classList.remove('active');
+            statusText.textContent = 'Tracking Stopped';
+            startBtn.style.display = 'block';
+            stopBtn.style.display = 'none';
+            routeSelectGroup.style.display = 'block';
+        });
+
+        socket.on('connect', () => {
+            console.log('Connected to server');
+        });
+    </script>
+</body>
+
+</html>

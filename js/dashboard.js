@@ -457,7 +457,24 @@ window.addEventListener('storage', function (e) {
 // User Dashboard with Interactive Maps - JavaScript
 // NO HARDCODED DATA - All from localStorage
 
-let routeMaps = {};
+// Socket.io initialization
+let socket;
+try {
+  socket = io();
+} catch (e) {
+  console.error("Socket.io not found. Are you running on port 3000?", e);
+  // Default dummy socket to prevent crash if on wrong port
+  socket = { on: () => { }, emit: () => { } };
+  alert(`Live tracking requires the Node.js server (Port 3000).\nYou are currently on: ${window.location.href}\nPlease use: http://localhost:3000/dashboard.html`);
+}
+
+let routeMaps = {}; // Stores map instances
+let activeWatchId = null;
+let activeTrackingRoute = null;
+let userMarker = null;
+let busMarker = null;
+let routePolyline = null;
+
 
 // Load data from localStorage
 function loadRoutes() {
@@ -605,18 +622,210 @@ function createRouteMap(containerId, stops) {
   }, 100);
 }
 
-function renderDashboardRoutes(filterText = '') {
+// Haversine formula to calculate distance
+function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
+  var R = 6371; // Radius of the earth in km
+  var dLat = deg2rad(lat2 - lat1);
+  var dLon = deg2rad(lon2 - lon1);
+  var a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat1)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  var d = R * c; // Distance in km
+  return d;
+}
+
+function deg2rad(deg) {
+  return deg * (Math.PI / 180)
+}
+
+function startLiveTracking(map, routeName, cardId) {
+  if (activeTrackingRoute === routeName) return;
+
+  // Leave previous room if any
+  if (activeTrackingRoute) {
+    console.log(`[Dashboard] Leaving room: ${activeTrackingRoute}`);
+    socket.emit('leave-bus-room', activeTrackingRoute);
+  }
+
+  // Clear previous tracking if any
+  if (activeWatchId) navigator.geolocation.clearWatch(activeWatchId);
+  userMarker = null;
+  busMarker = null;
+  activeWatchId = null; // Ensure ID is reset
+
+  if (routePolyline) {
+    if (map.hasLayer(routePolyline)) map.removeLayer(routePolyline);
+    routePolyline = null;
+  }
+
+  activeTrackingRoute = routeName;
+  const card = document.getElementById(cardId);
+  const liveIndicator = card.querySelector('.live-indicator');
+  const infoSection = card.querySelector('.bus-info-section'); // Where we'll show stats
+
+  // Add stats container if not exists
+  let statsContainer = infoSection.querySelector('.live-stats');
+  if (!statsContainer) {
+    statsContainer = document.createElement('div');
+    statsContainer.className = 'live-stats';
+    statsContainer.style.background = '#f0f9ff';
+    statsContainer.style.padding = '10px';
+    statsContainer.style.borderRadius = '8px';
+    statsContainer.style.marginTop = '10px';
+    statsContainer.style.border = '1px solid #bae6fd';
+    statsContainer.innerHTML = '<div id="stats-dist">Waiting for GPS...</div><div id="stats-eta"></div>';
+    infoSection.insertBefore(statsContainer, infoSection.firstChild);
+  }
+
+  liveIndicator.innerHTML = '<span style="color:red; font-weight:bold; animation: blink 1s infinite;">● LIVE</span>';
+
+  // 2. Listen for Bus Location (Register before joining)
+  socket.off('bus-location-update');
+
+  socket.on('bus-location-update', (data) => {
+    // console.log(`[Dashboard] Received location update for ${data.routeId}`, data);
+
+    // Strict filtering: Normalize both ID and Name to string and trim
+    const updateId = String(data.routeId).trim().toLowerCase();
+    const currentRoute = String(routeName).trim().toLowerCase();
+
+    if (updateId !== currentRoute) {
+      return;
+    }
+
+    const busLat = data.lat;
+    const busLng = data.lng;
+
+    // Update Bus Marker
+    if (!busMarker) {
+      console.log("[Dashboard] Creating Bus Marker");
+      const busIcon = L.divIcon({
+        className: 'bus-marker-icon',
+        html: '<div style="font-size:24px;">🚌</div>',
+        iconSize: [30, 30],
+        iconAnchor: [15, 15]
+      });
+      busMarker = L.marker([busLat, busLng], { icon: busIcon, zIndexOffset: 1000 }).addTo(map).bindPopup("Bus: " + (data.speed ? Math.round(data.speed * 3.6) + " km/h" : ""));
+    } else {
+      busMarker.setLatLng([busLat, busLng]);
+    }
+
+    // If we have user location, update lines and stats
+    if (userMarker) {
+      const userPos = userMarker.getLatLng();
+      updateRouteLines(map, userPos.lat, userPos.lng);
+
+      // Calculate Distance
+      const dist = getDistanceFromLatLonInKm(userPos.lat, userPos.lng, busLat, busLng);
+      const distEl = document.getElementById('stats-dist');
+      if (distEl) distEl.innerHTML = `<strong>Distance:</strong> ${dist.toFixed(2)} km`;
+
+      // Access fake speed (40km/h) or use real data if available
+      const speedKmH = (data.speed && data.speed > 0) ? (data.speed * 3.6) : 40;
+      const timeHours = dist / speedKmH;
+      const timeMins = Math.round(timeHours * 60);
+      const etaEl = document.getElementById('stats-eta');
+      if (etaEl) etaEl.innerHTML = `<strong>Est. Time:</strong> ${timeMins} mins`;
+    }
+  });
+
+  // 1. Get User Location (Starts immediately)
+  if (navigator.geolocation) {
+    console.log("[Dashboard] Requesting Geolocation permission...");
+    activeWatchId = navigator.geolocation.watchPosition((position) => {
+      // console.log("[Dashboard] Geolocation received:", position.coords);
+      const userLat = position.coords.latitude;
+      const userLng = position.coords.longitude;
+
+      // Update User Marker
+      if (!userMarker) {
+        const userIcon = L.divIcon({
+          className: 'user-marker',
+          html: '<div style="background:#ef4444; width:15px; height:15px; border-radius:50%; border:2px solid white; box-shadow:0 0 10px #ef4444;"></div>',
+          iconSize: [15, 15]
+        });
+        userMarker = L.marker([userLat, userLng], { icon: userIcon }).addTo(map).bindPopup("You");
+      } else {
+        userMarker.setLatLng([userLat, userLng]);
+      }
+      updateRouteLines(map, userLat, userLng);
+    }, (err) => {
+      console.error("[Dashboard] Geolocation error:", err);
+      // alert(`GPS Error: ${err.message}`);
+    }, { enableHighAccuracy: true });
+  }
+
+  // 3. Listen for Bus Offline
+  socket.on('bus-offline', (routeId) => {
+    const offlineId = String(routeId).trim().toLowerCase();
+    const currentRoute = String(routeName).trim().toLowerCase();
+
+    if (offlineId === currentRoute) {
+      console.log(`[Dashboard] Bus ${routeName} went offline.`);
+      if (busMarker) {
+        map.removeLayer(busMarker);
+        busMarker = null;
+      }
+      if (routePolyline) {
+        map.removeLayer(routePolyline);
+        routePolyline = null;
+      }
+      alert(`Bus ${routeName} has stopped tracking.`);
+    }
+  });
+
+  // Join Room (Now that listener is ready)
+  console.log(`[Dashboard] Joining room: ${routeName}`);
+  socket.emit('join-bus-room', routeName);
+}
+
+function updateRouteLines(map, userLat, userLng) {
+  if (!userMarker || !busMarker) return;
+
+  const userPos = userMarker.getLatLng();
+  const busPos = busMarker.getLatLng();
+
+  if (routePolyline) {
+    routePolyline.setLatLngs([userPos, busPos]);
+  } else {
+    routePolyline = L.polyline([userPos, busPos], {
+      color: '#3b82f6',
+      weight: 4,
+      dashArray: '10, 10',
+      opacity: 0.8
+    }).addTo(map);
+  }
+
+  // Fit bounds to show both
+  const bounds = L.latLngBounds([userPos, busPos]);
+  map.fitBounds(bounds, { padding: [50, 50] });
+}
+
+async function renderDashboardRoutes(filterText = '') {
   const container = document.getElementById('busCardsContainer');
   if (!container) return;
 
   container.innerHTML = '';
 
-  // Load from localStorage - this is what admin adds!
-  const routes = loadRoutes();
-  const buses = loadBuses();
+  // Fetch from Server (Centralized Data)
+  let routes = [];
+  let buses = [];
 
-  console.log('Loading routes from localStorage:', routes.length);
-  console.log('Loading buses from localStorage:', buses.length);
+  try {
+    const res = await fetch('/api/data');
+    const data = await res.json();
+    routes = data.routes || [];
+    buses = data.buses || [];
+  } catch (e) {
+    console.error("Failed to load data from server", e);
+    // Fallback to local if server fails (optional)
+    // routes = loadRoutes(); 
+  }
+
+  console.log('Loaded routes from Server:', routes.length);
+  console.log('Loaded buses from Server:', buses.length);
 
   if (routes.length === 0) {
     container.innerHTML = `
@@ -750,8 +959,27 @@ function renderDashboardRoutes(filterText = '') {
       isExpanded = !isExpanded;
       if (isExpanded) {
         card.classList.add('expanded');
+
+        // Start Live Tracking when expanded
+        console.log(`[Dashboard] Card expanded for ${route.name}. Checking map...`);
+        const map = routeMaps[mapId];
+        if (map) {
+          console.log("[Dashboard] Map found. Starting tracking...");
+          startLiveTracking(map, route.name, card.id);
+
+          // Force map resize fix
+          setTimeout(() => {
+            map.invalidateSize();
+          }, 200);
+        } else {
+          console.error("[Dashboard] Map object NOT found for " + mapId);
+          alert("Map Error: Please refresh the page.");
+        }
+
       } else {
         card.classList.remove('expanded');
+        // Optional: Stop tracking to save battery/data? 
+        // For now, we keep it running or logic can be added to stop.
       }
 
       // Invalidate map size after expansion

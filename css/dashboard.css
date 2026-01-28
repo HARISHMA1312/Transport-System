@@ -138,6 +138,20 @@ body {
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
 }
 
+.bus-card.expanded {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+    grid-column: 1 / -1; /* Make it take full width if grid */
+}
+
+.bus-card.expanded .bus-map {
+    height: 500px;
+}
+
+.bus-card.expanded .route-details-full {
+    display: block !important;
+}
+
 .bus-header {
     background: linear-gradient(135deg, #667eea, #764ba2);
     color: white;

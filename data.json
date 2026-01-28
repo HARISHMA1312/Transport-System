@@ -1,0 +1,94 @@
+{
+  "routes": [
+    {
+      "name": "r1",
+      "stops": [
+        {
+          "name": "tce",
+          "lat": 9.882877,
+          "lng": 78.081687,
+          "type": "source"
+        },
+        {
+          "name": "Madurai Junction",
+          "lat": 9.919234,
+          "lng": 78.111683,
+          "type": "intermediate"
+        },
+        {
+          "name": "K.Pudur",
+          "lat": 9.947137,
+          "lng": 78.145126,
+          "type": "intermediate"
+        },
+        {
+          "name": "Moondrumavadi",
+          "lat": 9.954066,
+          "lng": 78.150521,
+          "type": "destination"
+        }
+      ],
+      "buses": [
+        "1234"
+      ]
+    },
+    {
+      "name": "r2",
+      "stops": [
+        {
+          "name": "tce",
+          "lat": 9.882673,
+          "lng": 78.081666,
+          "type": "source"
+        },
+        {
+          "name": "harveypatti",
+          "lat": 9.8791,
+          "lng": 78.062604,
+          "type": "intermediate"
+        },
+        {
+          "name": "thirunagar",
+          "lat": 9.882058,
+          "lng": 78.052655,
+          "type": "intermediate"
+        },
+        {
+          "name": "thanakkankulam",
+          "lat": 9.882312,
+          "lng": 78.040214,
+          "type": "destination"
+        }
+      ],
+      "buses": [
+        "5678"
+      ]
+    }
+  ],
+  "buses": [
+    {
+      "busNo": "1234",
+      "driverName": "d1",
+      "driverPhone": "9999999999",
+      "status": "Active"
+    },
+    {
+      "busNo": "5678",
+      "driverName": "d2",
+      "driverPhone": "9888888888",
+      "status": "Active"
+    },
+    {
+      "busNo": "9876",
+      "driverName": "d3",
+      "driverPhone": "9777777777",
+      "status": "Active"
+    },
+    {
+      "busNo": "5432",
+      "driverName": "d4",
+      "driverPhone": "9666666666",
+      "status": "Active"
+    }
+  ]
+}
