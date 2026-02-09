@@ -568,18 +568,21 @@ function initDashboard() {
   renderDashboardRoutes();
 }
 
-function createRouteMap(containerId, stops) {
+function createRouteMap(containerId, route) {
   // Small delay to ensure container is in DOM
   setTimeout(() => {
     const container = document.getElementById(containerId);
     if (!container) return;
 
+    // specific map instance
     const map = L.map(containerId, {
       zoomControl: false,
       attributionControl: false
     });
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    const stops = route.stops || [];
 
     if (!stops || stops.length === 0) {
       map.setView([9.9252, 78.1198], 13);
@@ -604,13 +607,25 @@ function createRouteMap(containerId, stops) {
         .bindPopup(`<strong>${stop.name}</strong><br>${stop.type}`);
     });
 
-    // Draw polyline
-    if (stops.length > 1) {
+    // Draw Route Path
+    if (route.geometry && route.geometry.length > 0) {
+      // Use the saved detailed geometry
+      const polyline = L.polyline(route.geometry, {
+        color: '#667eea',
+        weight: 4,
+        opacity: 0.8,
+        lineJoin: 'round'
+      }).addTo(map);
+
+      map.fitBounds(polyline.getBounds(), { padding: [20, 20] });
+    } else if (stops.length > 1) {
+      // Fallback: Straight lines between stops
       const latlngs = stops.map(s => [s.lat, s.lng]);
       const polyline = L.polyline(latlngs, {
         color: '#667eea',
         weight: 3,
-        opacity: 0.7
+        opacity: 0.7,
+        dashArray: '5, 5' // Dotted to indicate straight line approximation
       }).addTo(map);
 
       map.fitBounds(polyline.getBounds(), { padding: [20, 20] });
@@ -950,7 +965,7 @@ async function renderDashboardRoutes(filterText = '') {
     container.appendChild(card);
 
     // Create map with stops from localStorage
-    createRouteMap(mapId, stops);
+    createRouteMap(mapId, route);
 
     // Card interactions
     let isExpanded = false;

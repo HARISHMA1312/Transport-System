@@ -619,6 +619,41 @@ let routeLine = null;
 let editingRouteIndex = null;
 let searchMarker = null;
 
+const ORS_API_KEY = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjRmODMwZDk3YjI5MTQ3N2I4NmFkNmNlYmFmYjAzODQxIiwiaCI6Im11cm11cjY0In0=';
+
+async function fetchRouteShape(stops) {
+  if (stops.length < 2) return null;
+
+  const coordinates = stops.map(s => [s.lng, s.lat]);
+
+  try {
+    const response = await fetch(
+      'https://api.openrouteservice.org/v2/directions/driving-car/geojson',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': ORS_API_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ coordinates })
+      }
+    );
+
+    const data = await response.json();
+
+    if (data.features && data.features.length > 0) {
+      const geoJsonCoords = data.features[0].geometry.coordinates;
+      return geoJsonCoords.map(c => [c[1], c[0]]); // convert to Leaflet format
+    }
+
+    return null;
+  } catch (e) {
+    console.error('ORS Request Failed', e);
+    return null;
+  }
+}
+
+
 // Load data from localStorage
 function loadRoutes() {
   try {
@@ -926,10 +961,12 @@ document.getElementById('clearMapBtn').addEventListener('click', () => {
 });
 
 // Save route
-document.getElementById('saveRouteBtn').addEventListener('click', () => {
+document.getElementById('saveRouteBtn').addEventListener('click', async () => {
   const name = document.getElementById('routeName').value.trim();
   const busSelect = document.getElementById('routeBuses');
-  const selectedBus = busSelect.value;
+  const selectedBus = busSelect.value; // It helps to get the value, but let's handle the multiple buses or single bus logic correctly as per previous logic which seemed to support arrays?
+  // Wait, previous code: buses: selectedBus ? [selectedBus] : []
+  // We keep that.
 
   if (!name) {
     alert('Please enter a route name');
@@ -949,11 +986,25 @@ document.getElementById('saveRouteBtn').addEventListener('click', () => {
     return;
   }
 
+  // Show loading state
+  const btn = document.getElementById('saveRouteBtn');
+  const originalText = btn.innerText;
+  btn.innerText = 'Calculating Route...';
+  btn.disabled = true;
+
+  // Fetch geometry
+  const geometry = await fetchRouteShape(routeStops);
+
+  if (!geometry) {
+    alert("Warning: Could not fetch route path from map service. Route will be saved with straight lines only.");
+  }
+
   const routes = loadRoutes();
   const newRoute = {
     name,
     stops: routeStops,
-    buses: selectedBus ? [selectedBus] : []
+    buses: selectedBus ? [selectedBus] : [],
+    geometry: geometry || null
   };
 
   if (editingRouteIndex !== null) {
@@ -965,6 +1016,10 @@ document.getElementById('saveRouteBtn').addEventListener('click', () => {
   saveRoutes(routes);
   renderRoutesList();
   clearForm();
+
+  btn.innerText = originalText;
+  btn.disabled = false;
+
   alert('Route saved successfully!');
 });
 
