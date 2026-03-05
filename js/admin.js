@@ -619,36 +619,34 @@ let routeLine = null;
 let editingRouteIndex = null;
 let searchMarker = null;
 
-const ORS_API_KEY = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjRmODMwZDk3YjI5MTQ3N2I4NmFkNmNlYmFmYjAzODQxIiwiaCI6Im11cm11cjY0In0=';
-
+// Open Source Routing Machine (OSRM) - No API Key required for demo/standard usage
 async function fetchRouteShape(stops) {
   if (stops.length < 2) return null;
 
-  const coordinates = stops.map(s => [s.lng, s.lat]);
+  // OSRM expects: /route/v1/driving/{lon},{lat};{lon},{lat}?overview=full&geometries=geojson
+  const coordinates = stops.map(s => `${s.lng},${s.lat}`).join(';');
 
   try {
     const response = await fetch(
-      'https://api.openrouteservice.org/v2/directions/driving-car/geojson',
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': ORS_API_KEY,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ coordinates })
-      }
+      `https://router.project-osrm.org/route/v1/driving/${coordinates}?overview=full&geometries=geojson`
     );
+
+    if (!response.ok) {
+      console.error('OSRM Request Failed:', response.status, response.statusText);
+      return null;
+    }
 
     const data = await response.json();
 
-    if (data.features && data.features.length > 0) {
-      const geoJsonCoords = data.features[0].geometry.coordinates;
-      return geoJsonCoords.map(c => [c[1], c[0]]); // convert to Leaflet format
+    if (data.routes && data.routes.length > 0) {
+      // OSRM returns [lon, lat], Leaflet needs [lat, lon]
+      const geoJsonCoords = data.routes[0].geometry.coordinates;
+      return geoJsonCoords.map(c => [c[1], c[0]]);
     }
 
     return null;
   } catch (e) {
-    console.error('ORS Request Failed', e);
+    console.error('OSRM Request Failed', e);
     return null;
   }
 }

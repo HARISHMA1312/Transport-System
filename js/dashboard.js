@@ -655,8 +655,87 @@ function deg2rad(deg) {
   return deg * (Math.PI / 180)
 }
 
+let activeRouteData = null; // Stores current route object for geometry calculations
+
+// ... (existing variables)
+
+// Helper: Get point on segment closest to P
+function getNearestPointOnSegment(P, A, B) {
+  const x = P.lat, y = P.lng;
+  const x1 = A[0], y1 = A[1];
+  const x2 = B[0], y2 = B[1];
+
+  const A_kw = x - x1;
+  const B_kw = y - y1;
+  const C = x2 - x1;
+  const D = y2 - y1;
+
+  const dot = A_kw * C + B_kw * D;
+  const len_sq = C * C + D * D;
+  let param = -1;
+
+  if (len_sq !== 0) param = dot / len_sq;
+
+  let xx, yy;
+
+  if (param < 0) {
+    xx = x1; yy = y1;
+  } else if (param > 1) {
+    xx = x2; yy = y2;
+  } else {
+    xx = x1 + param * C;
+    yy = y1 + param * D;
+  }
+
+  return L.latLng(xx, yy);
+}
+
+// Helper: Find nearest point on route geometry and its index
+function findNearestPointOnRoute(latLng, geometry) {
+  let minDist = Infinity;
+  let nearestPoint = null;
+  let nearestIndex = -1;
+
+  for (let i = 0; i < geometry.length - 1; i++) {
+    const P = getNearestPointOnSegment(latLng, geometry[i], geometry[i + 1]);
+    const dist = latLng.distanceTo(P); // Leaflet distanceTo (meters)
+
+    if (dist < minDist) {
+      minDist = dist;
+      nearestPoint = P;
+      nearestIndex = i;
+    }
+  }
+  return { point: nearestPoint, index: nearestIndex, distance: minDist };
+}
+
+// Helper: Calculate distance along route geometry points
+function getRouteDistance(geometry, startIndex, endIndex) {
+  let dist = 0;
+  // Ensure we go forward (if cyclic, this simple logic might just take short path or fail, assuming linear-ish routes for now)
+  // If endIndex < startIndex, it implies user is 'behind' bus? Handle simple case: swapping? 
+  // For bus tracking, we want Bus -> User. 
+
+  if (startIndex > endIndex) {
+    // Swap to calculate the segment length, but logic should handle direction
+    let temp = startIndex; startIndex = endIndex; endIndex = temp;
+  }
+
+  for (let i = startIndex; i < endIndex; i++) {
+    const p1 = L.latLng(geometry[i][0], geometry[i][1]);
+    const p2 = L.latLng(geometry[i + 1][0], geometry[i + 1][1]);
+    dist += p1.distanceTo(p2);
+  }
+  return dist;
+}
+
 function startLiveTracking(map, routeName, cardId) {
   if (activeTrackingRoute === routeName) return;
+
+  // Find and store route data
+  const routes = loadRoutes();
+  const foundRoute = routes.find(r => r.name === routeName);
+  activeRouteData = foundRoute || null;
 
   // Leave previous room if any
   if (activeTrackingRoute) {
@@ -732,17 +811,10 @@ function startLiveTracking(map, routeName, cardId) {
       const userPos = userMarker.getLatLng();
       updateRouteLines(map, userPos.lat, userPos.lng);
 
-      // Calculate Distance
-      const dist = getDistanceFromLatLonInKm(userPos.lat, userPos.lng, busLat, busLng);
-      const distEl = document.getElementById('stats-dist');
-      if (distEl) distEl.innerHTML = `<strong>Distance:</strong> ${dist.toFixed(2)} km`;
-
-      // Access fake speed (40km/h) or use real data if available
-      const speedKmH = (data.speed && data.speed > 0) ? (data.speed * 3.6) : 40;
-      const timeHours = dist / speedKmH;
-      const timeMins = Math.round(timeHours * 60);
-      const etaEl = document.getElementById('stats-eta');
-      if (etaEl) etaEl.innerHTML = `<strong>Est. Time:</strong> ${timeMins} mins`;
+      // We handle stats updates inside updateRouteLines now (for OSRM / Hybrid)
+      // BUT for fallback or direct calc, we might touch them. 
+      // Let's leave the old logic as immediate backup? 
+      // Actually updateRouteLines is async, so it will overwrite.
     }
   });
 
@@ -756,19 +828,29 @@ function startLiveTracking(map, routeName, cardId) {
 
       // Update User Marker
       if (!userMarker) {
+        // console.log("[Dashboard] Creating User Marker at", userLat, userLng);
         const userIcon = L.divIcon({
-          className: 'user-marker',
-          html: '<div style="background:#ef4444; width:15px; height:15px; border-radius:50%; border:2px solid white; box-shadow:0 0 10px #ef4444;"></div>',
-          iconSize: [15, 15]
+          className: 'custom-user-icon',
+          html: '<div class="user-marker-pulse"></div>',
+          iconSize: [20, 20],
+          iconAnchor: [10, 10]
         });
-        userMarker = L.marker([userLat, userLng], { icon: userIcon }).addTo(map).bindPopup("You");
+        userMarker = L.marker([userLat, userLng], { icon: userIcon }).addTo(map)
+          .bindTooltip("You", { permanent: true, direction: 'top', offset: [0, -10] });
       } else {
         userMarker.setLatLng([userLat, userLng]);
       }
       updateRouteLines(map, userLat, userLng);
     }, (err) => {
       console.error("[Dashboard] Geolocation error:", err);
-      // alert(`GPS Error: ${err.message}`);
+      // alert(`GPS Error: ${err.message}`); // Uncomment for debugging
+      if (err.code === 1) {
+        // PERMISSION_DENIED
+        console.warn("User denied Geolocation or insecure origin.");
+        alert("Location Access Denied. Please enable GPS permissions. \n\nNote: Chrome mobile blocks GPS on 'http'.");
+      } else if (err.message && err.message.toLowerCase().includes("secure")) {
+        alert("Security Error: Mobile browsers block GPS on 'http://'. \n\nTry using Firefox or enable 'Insecure origins treated as secure' in Chrome flags.");
+      }
     }, { enableHighAccuracy: true });
   }
 
@@ -796,25 +878,128 @@ function startLiveTracking(map, routeName, cardId) {
   socket.emit('join-bus-room', routeName);
 }
 
-function updateRouteLines(map, userLat, userLng) {
+// OSRM Routing Helper
+async function fetchRoutePath(start, end) {
+  // start/end: {lat, lng}
+  try {
+    const coords = `${start.lng},${start.lat};${end.lng},${end.lat}`;
+    const response = await fetch(
+      `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`
+    );
+
+    if (!response.ok) return null;
+    const data = await response.json();
+
+    if (data.routes && data.routes.length > 0) {
+      const route = data.routes[0];
+      return {
+        path: route.geometry.coordinates.map(c => [c[1], c[0]]), // to LatLng
+        distance: route.distance, // in meters
+        duration: route.duration // in seconds
+      };
+    }
+    return null;
+  } catch (e) {
+    console.error("Routing Error:", e);
+    return null;
+  }
+}
+
+async function updateRouteLines(map, userLat, userLng) {
   if (!userMarker || !busMarker) return;
 
   const userPos = userMarker.getLatLng();
   const busPos = busMarker.getLatLng();
 
+  // Default values
+  let latlngs = [userPos, busPos];
+  let dist = 0;
+  let duration = 0;
+  let usedHybrid = false;
+
+  // HYBRID LOGIC: Check if on route
+  if (activeRouteData && activeRouteData.geometry && activeRouteData.geometry.length > 1) {
+    const routeGeom = activeRouteData.geometry; // Array of [lat, lng]
+
+    // Check proximity (Threshold: 200 meters)
+    const busSnap = findNearestPointOnRoute(busPos, routeGeom);
+    const userSnap = findNearestPointOnRoute(userPos, routeGeom);
+
+    // If both are close to the route
+    if (busSnap.distance < 200 && userSnap.distance < 200) {
+      usedHybrid = true;
+
+      // Extract Geometry Slice
+      let idx1 = busSnap.index;
+      let idx2 = userSnap.index;
+
+      // Handle directions? Assuming Bus -> User direction for now
+      // If User is 'upstream' (lower index), we might just show path backward or forward?
+      // Let's just grab slice between min and max and reverse if needed?
+      // Actually for ETA we assume Bus moves towards Destination. 
+      // If user is BEHIND bus, ETA shouldn't be valid? 
+      // For simplicity: Just show path between them along route.
+
+      const startIndex = Math.min(idx1, idx2);
+      const endIndex = Math.max(idx1, idx2);
+
+      const pathPoints = [];
+      pathPoints.push(busPos); // Start at bus
+      // Add middle points
+      for (let i = startIndex + 1; i <= endIndex; i++) {
+        pathPoints.push(L.latLng(routeGeom[i][0], routeGeom[i][1]));
+      }
+      pathPoints.push(userPos); // End at user
+
+      latlngs = pathPoints;
+
+      // Calculate Distance along route
+      dist = getRouteDistance(routeGeom, startIndex, endIndex) / 1000; // km
+      // Approx time
+      duration = (dist / 40) * 60; // default 40km/h
+    }
+  }
+
+  // Fallback to OSRM if not on route
+  if (!usedHybrid) {
+    // Try to get road path
+    const routeData = await fetchRoutePath(userPos, busPos);
+
+    if (routeData) {
+      latlngs = routeData.path;
+      dist = routeData.distance / 1000; // km
+      duration = routeData.duration / 60; // mins
+    } else {
+      // Straight line fallback
+      dist = getDistanceFromLatLonInKm(userPos.lat, userPos.lng, busPos.lat, busPos.lng);
+      duration = (dist / 40) * 60;
+    }
+  }
+
+  // Update Polyline
   if (routePolyline) {
-    routePolyline.setLatLngs([userPos, busPos]);
+    routePolyline.setLatLngs(latlngs);
   } else {
-    routePolyline = L.polyline([userPos, busPos], {
-      color: '#3b82f6',
-      weight: 4,
-      dashArray: '10, 10',
-      opacity: 0.8
+    routePolyline = L.polyline(latlngs, {
+      color: usedHybrid ? '#10b981' : '#3b82f6', // Green if on-route, Blue if off-route
+      weight: 5,
+      opacity: 0.8,
+      lineJoin: 'round'
     }).addTo(map);
   }
 
-  // Fit bounds to show both
-  const bounds = L.latLngBounds([userPos, busPos]);
+  // Update Color if changed mode
+  routePolyline.setStyle({ color: usedHybrid ? '#10b981' : '#3b82f6' });
+
+  // Update Stats UI
+  const distEl = document.getElementById('stats-dist');
+  if (distEl) distEl.innerHTML = `<strong>Distance:</strong> ${dist.toFixed(2)} km ${usedHybrid ? '(On Route)' : ''}`;
+
+  const etaEl = document.getElementById('stats-eta');
+  if (etaEl) etaEl.innerHTML = `<strong>Est. Time:</strong> ${Math.ceil(duration)} mins`;
+
+  // Fit bounds nicely
+  const bounds = L.latLngBounds(latlngs);
   map.fitBounds(bounds, { padding: [50, 50] });
 }
 
