@@ -729,6 +729,44 @@ function getRouteDistance(geometry, startIndex, endIndex) {
   return dist;
 }
 
+// Global variable for weather-based ETA delay
+let globalWeatherDelayFactor = 1.0; 
+
+// Fetch weather for the given location using Open-Meteo API
+async function fetchWeather(lat, lng) {
+  try {
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true`);
+    const data = await res.json();
+    if (data && data.current_weather) {
+      const weatherEl = document.getElementById('stats-weather');
+      if (weatherEl) {
+        const temp = data.current_weather.temperature;
+        const wind = data.current_weather.windspeed;
+        
+        // Basic interpretation of WMO weather code
+        const code = data.current_weather.weathercode;
+        let condition = "Clear";
+        let icon = "☀️";
+        globalWeatherDelayFactor = 1.0; // Default clear
+
+        if (code === 1 || code === 2 || code === 3) { condition = "Partly Cloudy"; icon = "⛅"; globalWeatherDelayFactor = 1.0; }
+        else if (code >= 45 && code <= 48) { condition = "Fog"; icon = "🌫️"; globalWeatherDelayFactor = 1.10; } // 10% penalty
+        else if (code >= 51 && code <= 67) { condition = "Rain"; icon = "🌧️"; globalWeatherDelayFactor = 1.15; } // 15% penalty
+        else if (code >= 71 && code <= 77) { condition = "Snow"; icon = "❄️"; globalWeatherDelayFactor = 1.25; } // 25% penalty
+        else if (code >= 80 && code <= 82) { condition = "Showers"; icon = "🌦️"; globalWeatherDelayFactor = 1.15; }
+        else if (code >= 95 && code <= 99) { condition = "Thunderstorm"; icon = "⛈️"; globalWeatherDelayFactor = 1.25; }
+        
+        weatherEl.innerHTML = `<strong>Weather:</strong> ${icon} ${temp}°C, ${condition} (Wind: ${wind} km/h)`;
+      }
+    }
+  } catch (err) {
+    console.error("Weather fetch error:", err);
+    globalWeatherDelayFactor = 1.0;
+    const weatherEl = document.getElementById('stats-weather');
+    if (weatherEl) weatherEl.innerHTML = `<strong>Weather:</strong> Unavailable`;
+  }
+}
+
 function startLiveTracking(map, routeName, cardId) {
   if (activeTrackingRoute === routeName) return;
 
@@ -769,7 +807,7 @@ function startLiveTracking(map, routeName, cardId) {
     statsContainer.style.borderRadius = '8px';
     statsContainer.style.marginTop = '10px';
     statsContainer.style.border = '1px solid #bae6fd';
-    statsContainer.innerHTML = '<div id="stats-dist">Waiting for GPS...</div><div id="stats-eta"></div>';
+    statsContainer.innerHTML = '<div id="stats-dist">Waiting for GPS...</div><div id="stats-eta"></div><div id="stats-weather" style="margin-top: 5px;">Fetching weather...</div>';
     infoSection.insertBefore(statsContainer, infoSection.firstChild);
   }
 
@@ -837,6 +875,9 @@ function startLiveTracking(map, routeName, cardId) {
         });
         userMarker = L.marker([userLat, userLng], { icon: userIcon }).addTo(map)
           .bindTooltip("You", { permanent: true, direction: 'top', offset: [0, -10] });
+          
+        // Fetch weather for user location
+        fetchWeather(userLat, userLng);
       } else {
         userMarker.setLatLng([userLat, userLng]);
       }
@@ -976,6 +1017,64 @@ async function updateRouteLines(map, userLat, userLng) {
     }
   }
 
+  // --- AI & ENVIRONMENTAL ADJUSTMENTS ---
+  // 1. Weather impact
+  duration = duration * globalWeatherDelayFactor;
+  
+  // 2. AI Online Learning Prediction Correction
+  let aiCorrectionFactor = 1.0;
+  try {
+    const aiData = JSON.parse(localStorage.getItem('ai_learning_factors') || '{}');
+    if (activeTrackingRoute && aiData[activeTrackingRoute]) {
+       aiCorrectionFactor = aiData[activeTrackingRoute];
+    }
+  } catch (e) {}
+  
+  duration = duration * aiCorrectionFactor;
+
+  // 3. AI Learning: Record predictions vs actual
+  if (!window.aiTrackingData) window.aiTrackingData = {};
+  
+  // Initialize tracking for this route if not exists
+  if (!window.aiTrackingData[activeTrackingRoute] && duration > 0 && dist > 0.5) {
+      window.aiTrackingData[activeTrackingRoute] = {
+          startTime: Date.now(),
+          initialPredictedDuration: duration,
+          startDist: dist,
+          arrivalRecorded: false
+      };
+  }
+  
+  if (window.aiTrackingData[activeTrackingRoute]) {
+      const trackData = window.aiTrackingData[activeTrackingRoute];
+      
+      // If the bus has just arrived (distance < 0.1km or 100m) and it hasn't been recorded yet
+      if (dist < 0.1 && trackData.startDist > 0.5 && !trackData.arrivalRecorded) {
+          const actualDurationMins = (Date.now() - trackData.startTime) / 60000;
+          
+          // Calculate error ratio
+          const errorRatio = actualDurationMins / trackData.initialPredictedDuration;
+          
+          // We only consider reasonable errors (to avoid spikes, e.g., if driver took a long break)
+          if (errorRatio > 0.5 && errorRatio < 3.0) {
+              // Learning Rate (Alpha) = 0.1
+              const newAiFactor = (aiCorrectionFactor * 0.9) + (errorRatio * 0.1);
+              
+              try {
+                 const aiData = JSON.parse(localStorage.getItem('ai_learning_factors') || '{}');
+                 aiData[activeTrackingRoute] = newAiFactor;
+                 localStorage.setItem('ai_learning_factors', JSON.stringify(aiData));
+                 console.log(`[AI Learning] Updated factor for ${activeTrackingRoute}: ${newAiFactor.toFixed(3)}. Error was ${errorRatio.toFixed(3)}`);
+              } catch(e) {}
+          }
+          
+          trackData.arrivalRecorded = true;
+      } else if (dist > 0.5 && trackData.arrivalRecorded) {
+          // Reset tracking if bus is far away again (e.g., started a new trip)
+          delete window.aiTrackingData[activeTrackingRoute];
+      }
+  }
+
   // Update Polyline
   if (routePolyline) {
     routePolyline.setLatLngs(latlngs);
@@ -996,7 +1095,11 @@ async function updateRouteLines(map, userLat, userLng) {
   if (distEl) distEl.innerHTML = `<strong>Distance:</strong> ${dist.toFixed(2)} km ${usedHybrid ? '(On Route)' : ''}`;
 
   const etaEl = document.getElementById('stats-eta');
-  if (etaEl) etaEl.innerHTML = `<strong>Est. Time:</strong> ${Math.ceil(duration)} mins`;
+  if (etaEl) {
+      const aiNote = Math.abs(1.0 - aiCorrectionFactor) > 0.05 ? '<span style="color:#10b981;font-size:0.8em;margin-left:5px;">(AI Adjusted)</span>' : '';
+      const weatherNote = globalWeatherDelayFactor > 1.0 ? '<span style="color:#ef4444;font-size:0.8em;margin-left:5px;">(Weather Delay)</span>' : '';
+      etaEl.innerHTML = `<strong>Est. Time:</strong> ${Math.ceil(duration)} mins ${aiNote} ${weatherNote}`;
+  }
 
   // Fit bounds nicely
   const bounds = L.latLngBounds(latlngs);
