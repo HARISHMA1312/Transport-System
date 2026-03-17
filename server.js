@@ -1,3 +1,4 @@
+
 const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
@@ -12,39 +13,157 @@ app.use(express.static(__dirname));
 // Use JSON body parser
 app.use(express.json());
 
-const DATA_FILE = path.join(__dirname, 'data.json');
+// require('dotenv').config();
+const mongoose = require('mongoose');
 
-// Helper to read data
-function readData() {
-    if (!fs.existsSync(DATA_FILE)) {
-        return { routes: [], buses: [] };
-    }
+// Import Schemas
+const Route = require('./models/Route');
+const Bus = require('./models/Bus');
+const User = require('./models/User');
+const Admin = require('./models/Admin');
+
+// Connect to MongoDB
+
+require("dotenv").config();
+
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log("MongoDB Connected"))
+  .catch(err => console.log("MongoDB connection error:", err));
+
+// API Endpoints: Get Routes and Buses
+app.get('/api/data', async (req, res) => {
     try {
-        return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-    } catch (e) {
-        return { routes: [], buses: [] };
+        const routes = await Route.find({});
+        const buses = await Bus.find({});
+        res.json({ routes, buses });
+    } catch (error) {
+        console.error("Error fetching data:", error);
+        res.status(500).json({ error: "Failed to fetch data from database" });
     }
-}
-
-// Helper to save data
-function saveData(data) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-}
-
-// API Endpoints
-app.get('/api/data', (req, res) => {
-    res.json(readData());
 });
 
-app.post('/api/data', (req, res) => {
-    // Expect { routes, buses }
-    const newData = req.body;
-    saveData(newData);
-    // Also update in-memory locations if needed or just rely on IDs
-    res.json({ success: true });
+app.post('/api/data', async (req, res) => {
+    try {
+        const { routes, buses } = req.body;
+        
+        // This is a simple bulk overwrite strategy for the admin panel.
+        // In a production app you'd want individual endpoints (e.g., POST /api/route, PUT /api/route/:id)
+        if (routes) {
+            await Route.deleteMany({});
+            await Route.insertMany(routes);
+        }
+        if (buses) {
+            await Bus.deleteMany({});
+            await Bus.insertMany(buses);
+        }
+        res.json({ success: true });
+    } catch (error) {
+        console.error("Error saving data:", error);
+        res.status(500).json({ error: "Failed to save data" });
+    }
 });
 
-// Store latest locations in memory
+// --- Authentication Endpoints ---
+
+// User Registration
+app.post('/api/auth/register-user', async (req, res) => {
+    try {
+        const { name, phone, password } = req.body;
+        
+        // Check if user exists
+        const existingUser = await User.findOne({ phone });
+        if (existingUser) {
+            return res.status(400).json({ error: 'User already exists' });
+        }
+
+        const newUser = new User({ name, phone, password });
+        await newUser.save();
+        
+        res.status(201).json({ success: true, message: 'User registered successfully' });
+    } catch (error) {
+        console.error('Registration Error:', error);
+        res.status(500).json({ error: 'Registration failed' });
+    }
+});
+
+// User Login
+app.post('/api/auth/login-user', async (req, res) => {
+    try {
+        const { phone, password } = req.body;
+        const user = await User.findOne({ phone, password }); // Note: In production, hash passwords!
+        
+        if (!user) {
+            return res.status(401).json({ error: 'Invalid phone or password' });
+        }
+        res.json({ success: true, user: { name: user.name, phone: user.phone, route: user.busRoute } });
+    } catch (error) {
+        res.status(500).json({ error: 'Login failed' });
+    }
+});
+
+// Admin Registration
+app.post('/api/auth/register-admin', async (req, res) => {
+    try {
+        const { name, email, phone, password } = req.body;
+        const existingAdmin = await Admin.findOne({ phone });
+        if (existingAdmin) {
+            return res.status(400).json({ error: 'Admin already exists' });
+        }
+
+        const newAdmin = new Admin({ name, email, phone, password });
+        await newAdmin.save();
+        res.status(201).json({ success: true, message: 'Admin registered successfully' });
+    } catch (error) {
+        res.status(500).json({ error: 'Registration failed' });
+    }
+});
+
+// Admin Login
+app.post('/api/auth/login-admin', async (req, res) => {
+    try {
+        const { phone, password } = req.body;
+        const admin = await Admin.findOne({ phone, password });
+        
+        if (!admin) {
+            return res.status(401).json({ error: 'Invalid phone or password' });
+        }
+        res.json({ success: true, admin: { name: admin.name, email: admin.email, phone: admin.phone } });
+    } catch (error) {
+        res.status(500).json({ error: 'Login failed' });
+    }
+});
+
+// AI Learning Endpoints
+const AIFactor = require('./models/AIFactor');
+
+// Get all AI factors
+app.get('/api/ai/factors', async (req, res) => {
+    try {
+        const factors = await AIFactor.find({});
+        const factorMap = {};
+        factors.forEach(f => factorMap[f.routeId] = f.factor);
+        res.json(factorMap);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch AI factors' });
+    }
+});
+
+// Update an AI factor
+app.post('/api/ai/factor', async (req, res) => {
+    try {
+        const { routeId, factor } = req.body;
+        await AIFactor.findOneAndUpdate(
+            { routeId },
+            { factor, lastUpdated: Date.now() },
+            { upsert: true, new: true }
+        );
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update AI factor' });
+    }
+});
+
+// Store latest locations in memory (Kept for blazing fast Socket.io performance)
 // Map<busRouteId, { lat, lng, timestamp, heading, speed }>
 const busLocations = new Map();
 
@@ -112,4 +231,5 @@ const PORT = process.env.PORT || 3000;
 http.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
 });
+
 

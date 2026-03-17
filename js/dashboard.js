@@ -166,24 +166,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Verify OTP
     if (userVerifyOtpBtn) {
-      userVerifyOtpBtn.addEventListener('click', (e) => {
+      userVerifyOtpBtn.addEventListener('click', async (e) => {
         e.preventDefault();
 
         const otp = Array.from(userOtpInputs).map(input => input.value).join('');
         const otpError = document.getElementById('userOtpError');
 
         if (otp === DEFAULT_OTP) {
-          const users = JSON.parse(localStorage.getItem('users')) || [];
-          users.push({
-            name: userName.value.trim(),
-            phone: '+91 ' + userPhone.value,
-            password: userPassword.value
-          });
-          localStorage.setItem('users', JSON.stringify(users));
+          
+          try {
+              const res = await fetch('/api/auth/register-user', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                      name: userName.value.trim(),
+                      phone: '+91 ' + userPhone.value,
+                      password: userPassword.value
+                  })
+              });
+              
+              const data = await res.json();
+              if (res.ok) {
+                  alert('Registration successful! Redirecting to login...');
+                  clearInterval(userTimerInterval);
+                  window.location.href = 'user-login.html';
+              } else {
+                  alert(data.error || 'Registration failed');
+                  window.location.href = 'user-login.html';
+              }
+          } catch (err) {
+              console.error(err);
+              alert('Error connecting to server. Please try again later.');
+          }
 
-          alert('Registration successful! Redirecting to login...');
-          clearInterval(userTimerInterval);
-          window.location.href = 'user-login.html';
         } else {
           otpError.classList.add('show');
           setTimeout(() => {
@@ -255,7 +270,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (userLoginBtn) {
-      userLoginBtn.addEventListener('click', (e) => {
+      userLoginBtn.addEventListener('click', async (e) => {
         e.preventDefault();
 
         const phoneError = document.getElementById('userLoginPhoneError');
@@ -270,31 +285,47 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
         }
 
-        const users = JSON.parse(localStorage.getItem('users')) || [];
-        const user = users.find(u => u.phone === '+91 ' + userLoginPhone.value && u.password === userLoginPassword.value);
+        try {
+            const res = await fetch('/api/auth/login-user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    phone: '+91 ' + userLoginPhone.value,
+                    password: userLoginPassword.value
+                })
+            });
+            
+            const data = await res.json();
+            
+            if (res.ok && data.user) {
+                // Keep session logic for UX map tracking, but derived from actual DB
+                const userSession = {
+                  name: data.user.name,
+                  phone: data.user.phone,
+                  loginTime: new Date().toISOString()
+                };
+                localStorage.setItem('userLogin', JSON.stringify(userSession));
 
-        if (user) {
-          const userSession = {
-            name: user.name,
-            phone: user.phone,
-            loginTime: new Date().toISOString()
-          };
-          localStorage.setItem('userLogin', JSON.stringify(userSession));
+                // Initialize empty profile if none exists for mapping
+                if (!localStorage.getItem('userProfile')) {
+                  const initialProfile = {
+                    name: data.user.name,
+                    phone: data.user.phone,
+                    busRoute: data.user.route || '',
+                    department: ''
+                  };
+                  localStorage.setItem('userProfile', JSON.stringify(initialProfile));
+                }
 
-          if (!localStorage.getItem('userProfile')) {
-            const initialProfile = {
-              name: user.name,
-              phone: user.phone,
-              busRoute: '',
-              department: ''
-            };
-            localStorage.setItem('userProfile', JSON.stringify(initialProfile));
-          }
-
-          alert(`Welcome ${user.name}! Login successful.`);
-          window.location.href = 'live-track.html';
-        } else {
-          passwordError.classList.add('show');
+                alert(`Welcome ${data.user.name}! Login successful.`);
+                window.location.href = 'live-track.html';
+            } else {
+                passwordError.classList.add('show');
+                if(data.error) console.warn("Login rejection:", data.error);
+            }
+        } catch (err) {
+            console.error("Login Error:", err);
+            alert("Connection error. Please ensure the server is running.");
         }
       });
     }
@@ -318,7 +349,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (adminRegisterBtn) {
-      adminRegisterBtn.addEventListener('click', (e) => {
+      adminRegisterBtn.addEventListener('click', async (e) => {
         e.preventDefault();
 
         const nameError = document.getElementById('adminNameError');
@@ -356,25 +387,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (isValid) {
-          const admins = JSON.parse(localStorage.getItem('admins')) || [];
-          const existingAdmin = admins.find(a => a.phone === '+91 ' + adminPhone.value);
-
-          if (existingAdmin) {
-            alert('Admin already exists. Redirecting to login...');
-            window.location.href = 'admin-login.html';
-            return;
+          try {
+              const res = await fetch('/api/auth/register-admin', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                      name: adminName.value.trim(),
+                      email: adminEmail.value.trim(),
+                      phone: '+91 ' + adminPhone.value,
+                      password: adminPassword.value
+                  })
+              });
+              
+              const data = await res.json();
+              if (res.ok) {
+                  alert('Admin registration successful! Redirecting to login...');
+                  window.location.href = 'admin-login.html';
+              } else {
+                  alert(data.error || 'Registration failed');
+              }
+          } catch (err) {
+              console.error(err);
+              alert('Error connecting to server.');
           }
-
-          admins.push({
-            name: adminName.value.trim(),
-            email: adminEmail.value.trim(),
-            phone: '+91 ' + adminPhone.value,
-            password: adminPassword.value
-          });
-          localStorage.setItem('admins', JSON.stringify(admins));
-
-          alert('Admin registration successful! Redirecting to login...');
-          window.location.href = 'admin-login.html';
         }
       });
     }
@@ -396,7 +431,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (adminLoginBtn) {
-      adminLoginBtn.addEventListener('click', (e) => {
+      adminLoginBtn.addEventListener('click', async (e) => {
         e.preventDefault();
 
         const phoneError = document.getElementById('adminLoginPhoneError');
@@ -411,22 +446,35 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
         }
 
-        const admins = JSON.parse(localStorage.getItem('admins')) || [];
-        const admin = admins.find(a => a.phone === '+91 ' + adminLoginPhone.value && a.password === adminLoginPassword.value);
+        try {
+            const res = await fetch('/api/auth/login-admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    phone: '+91 ' + adminLoginPhone.value,
+                    password: adminLoginPassword.value
+                })
+            });
+            
+            const data = await res.json();
+            
+            if (res.ok && data.admin) {
+                const adminSession = {
+                  name: data.admin.name,
+                  phone: data.admin.phone,
+                  email: data.admin.email,
+                  loginTime: new Date().toISOString()
+                };
+                localStorage.setItem('adminLogin', JSON.stringify(adminSession));
 
-        if (admin) {
-          const adminSession = {
-            name: admin.name,
-            phone: admin.phone,
-            email: admin.email,
-            loginTime: new Date().toISOString()
-          };
-          localStorage.setItem('adminLogin', JSON.stringify(adminSession));
-
-          alert(`Welcome ${admin.name}! Admin login successful.`);
-          window.location.href = 'admin/admin-dashboard.html';
-        } else {
-          passwordError.classList.add('show');
+                alert(`Welcome ${data.admin.name}! Admin login successful.`);
+                window.location.href = 'admin/admin-dashboard.html';
+            } else {
+                passwordError.classList.add('show');
+            }
+        } catch (err) {
+            console.error("Login Error:", err);
+            alert("Connection error. Please ensure the server is running.");
         }
       });
     }
@@ -474,23 +522,92 @@ let activeTrackingRoute = null;
 let userMarker = null;
 let busMarker = null;
 let routePolyline = null;
+window.customDestinations = {}; // Track custom targets per route
+
+window.selectCustomStop = function(routeName, lat, lng, stopName, cardId) {
+    window.customDestinations[routeName] = { lat, lng, name: stopName };
+    
+    // Update UI highlights dynamically without collapsing the card
+    const card = document.getElementById(cardId);
+    if (card) {
+        card.querySelectorAll('.route-point').forEach(el => {
+            el.style.background = 'transparent';
+            el.style.borderLeft = 'none';
+        });
+        const point = Array.from(card.querySelectorAll('.route-point')).find(el => el.textContent.includes(stopName));
+        if (point) {
+            point.style.background = '#dbeafe';
+            point.style.borderLeft = '3px solid #3b82f6';
+        }
+        
+        const resetBtn = card.querySelector('.reset-location-btn');
+        if (resetBtn) resetBtn.style.display = 'inline-block';
+    }
+
+    if (activeTrackingRoute === routeName && userMarker) {
+        const mapDiv = card.querySelector('.bus-map div');
+        if (mapDiv && routeMaps[mapDiv.id]) {
+            updateRouteLines(routeMaps[mapDiv.id], userMarker.getLatLng().lat, userMarker.getLatLng().lng);
+        }
+    }
+};
+
+window.resetToUserLocation = function(routeName, cardId) {
+    if (window.customDestinations[routeName]) {
+        delete window.customDestinations[routeName];
+    }
+    
+    // Update UI
+    const card = document.getElementById(cardId);
+    if (card) {
+        card.querySelectorAll('.route-point').forEach(el => {
+            el.style.background = 'transparent';
+            el.style.borderLeft = 'none';
+        });
+        const resetBtn = card.querySelector('.reset-location-btn');
+        if (resetBtn) resetBtn.style.display = 'none';
+    }
+
+    if (activeTrackingRoute === routeName && userMarker) {
+        const mapDiv = card.querySelector('.bus-map div');
+        if (mapDiv && routeMaps[mapDiv.id]) {
+            updateRouteLines(routeMaps[mapDiv.id], userMarker.getLatLng().lat, userMarker.getLatLng().lng);
+        }
+    }
+};
 
 
-// Load data from localStorage
-function loadRoutes() {
+// Server Data Cache
+window.appData = { routes: [], buses: [] };
+
+async function fetchServerData() {
   try {
-    return JSON.parse(localStorage.getItem('routes') || '[]');
-  } catch (e) {
-    return [];
+    const [resData, resAi] = await Promise.all([
+        fetch('/api/data'),
+        fetch('/api/ai/factors')
+    ]);
+    
+    if (resData.ok) {
+      window.appData = await resData.json();
+    }
+    
+    if (resAi.ok) {
+      window.globalAIFactors = await resAi.json();
+    } else {
+        window.globalAIFactors = {};
+    }
+  } catch (err) {
+    console.error("Failed to fetch server data", err);
+    window.globalAIFactors = {};
   }
 }
 
+function loadRoutes() {
+  return window.appData.routes || [];
+}
+
 function loadBuses() {
-  try {
-    return JSON.parse(localStorage.getItem('buses') || '[]');
-  } catch (e) {
-    return [];
-  }
+  return window.appData.buses || [];
 }
 
 function loadUserProfile() {
@@ -536,7 +653,10 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-function initDashboard() {
+async function initDashboard() {
+  // 1. Fetch live data from MongoDB first
+  await fetchServerData();
+
   const profile = loadUserProfile();
 
   const userName = document.getElementById('userName');
@@ -947,13 +1067,22 @@ async function fetchRoutePath(start, end) {
 }
 
 async function updateRouteLines(map, userLat, userLng) {
-  if (!userMarker || !busMarker) return;
+  if (!busMarker) return; // userMarker might be null theoretically, but we might have a target.
 
-  const userPos = userMarker.getLatLng();
+  // 1. Determine Target Destination
+  let targetPos;
+  let customDest = window.customDestinations && window.customDestinations[activeTrackingRoute];
+  if (customDest) {
+      targetPos = L.latLng(customDest.lat, customDest.lng);
+  } else {
+      if (!userMarker) return; // Need user marker if no custom dest
+      targetPos = userMarker.getLatLng();
+  }
+
   const busPos = busMarker.getLatLng();
 
   // Default values
-  let latlngs = [userPos, busPos];
+  let latlngs = [targetPos, busPos];
   let dist = 0;
   let duration = 0;
   let usedHybrid = false;
@@ -964,22 +1093,15 @@ async function updateRouteLines(map, userLat, userLng) {
 
     // Check proximity (Threshold: 200 meters)
     const busSnap = findNearestPointOnRoute(busPos, routeGeom);
-    const userSnap = findNearestPointOnRoute(userPos, routeGeom);
+    const targetSnap = findNearestPointOnRoute(targetPos, routeGeom);
 
     // If both are close to the route
-    if (busSnap.distance < 200 && userSnap.distance < 200) {
+    if (busSnap.distance < 200 && targetSnap.distance < 200) {
       usedHybrid = true;
 
       // Extract Geometry Slice
       let idx1 = busSnap.index;
-      let idx2 = userSnap.index;
-
-      // Handle directions? Assuming Bus -> User direction for now
-      // If User is 'upstream' (lower index), we might just show path backward or forward?
-      // Let's just grab slice between min and max and reverse if needed?
-      // Actually for ETA we assume Bus moves towards Destination. 
-      // If user is BEHIND bus, ETA shouldn't be valid? 
-      // For simplicity: Just show path between them along route.
+      let idx2 = targetSnap.index;
 
       const startIndex = Math.min(idx1, idx2);
       const endIndex = Math.max(idx1, idx2);
@@ -990,7 +1112,7 @@ async function updateRouteLines(map, userLat, userLng) {
       for (let i = startIndex + 1; i <= endIndex; i++) {
         pathPoints.push(L.latLng(routeGeom[i][0], routeGeom[i][1]));
       }
-      pathPoints.push(userPos); // End at user
+      pathPoints.push(targetPos); // End at target
 
       latlngs = pathPoints;
 
@@ -1004,7 +1126,7 @@ async function updateRouteLines(map, userLat, userLng) {
   // Fallback to OSRM if not on route
   if (!usedHybrid) {
     // Try to get road path
-    const routeData = await fetchRoutePath(userPos, busPos);
+    const routeData = await fetchRoutePath(targetPos, busPos);
 
     if (routeData) {
       latlngs = routeData.path;
@@ -1012,7 +1134,7 @@ async function updateRouteLines(map, userLat, userLng) {
       duration = routeData.duration / 60; // mins
     } else {
       // Straight line fallback
-      dist = getDistanceFromLatLonInKm(userPos.lat, userPos.lng, busPos.lat, busPos.lng);
+      dist = getDistanceFromLatLonInKm(targetPos.lat, targetPos.lng, busPos.lat, busPos.lng);
       duration = (dist / 40) * 60;
     }
   }
@@ -1024,7 +1146,7 @@ async function updateRouteLines(map, userLat, userLng) {
   // 2. AI Online Learning Prediction Correction
   let aiCorrectionFactor = 1.0;
   try {
-    const aiData = JSON.parse(localStorage.getItem('ai_learning_factors') || '{}');
+    const aiData = window.globalAIFactors || {};
     if (activeTrackingRoute && aiData[activeTrackingRoute]) {
        aiCorrectionFactor = aiData[activeTrackingRoute];
     }
@@ -1061,9 +1183,17 @@ async function updateRouteLines(map, userLat, userLng) {
               const newAiFactor = (aiCorrectionFactor * 0.9) + (errorRatio * 0.1);
               
               try {
-                 const aiData = JSON.parse(localStorage.getItem('ai_learning_factors') || '{}');
-                 aiData[activeTrackingRoute] = newAiFactor;
-                 localStorage.setItem('ai_learning_factors', JSON.stringify(aiData));
+                 // Update local cache immediately
+                 if (!window.globalAIFactors) window.globalAIFactors = {};
+                 window.globalAIFactors[activeTrackingRoute] = newAiFactor;
+                 
+                 // Persist to MongoDB Server
+                 fetch('/api/ai/factor', {
+                     method: 'POST',
+                     headers: { 'Content-Type': 'application/json' },
+                     body: JSON.stringify({ routeId: activeTrackingRoute, factor: newAiFactor })
+                 }).catch(e => console.error('Failed to sync AI factor to server', e));
+
                  console.log(`[AI Learning] Updated factor for ${activeTrackingRoute}: ${newAiFactor.toFixed(3)}. Error was ${errorRatio.toFixed(3)}`);
               } catch(e) {}
           }
@@ -1075,12 +1205,18 @@ async function updateRouteLines(map, userLat, userLng) {
       }
   }
 
+  // Determine polyline color
+  let polyColor = usedHybrid ? '#10b981' : '#3b82f6'; // Green if on-route, normal Blue if off
+  if (customDest) {
+    polyColor = '#0ea5e9'; // Distinct Light Blue for custom stops
+  }
+
   // Update Polyline
   if (routePolyline) {
     routePolyline.setLatLngs(latlngs);
   } else {
     routePolyline = L.polyline(latlngs, {
-      color: usedHybrid ? '#10b981' : '#3b82f6', // Green if on-route, Blue if off-route
+      color: polyColor,
       weight: 5,
       opacity: 0.8,
       lineJoin: 'round'
@@ -1088,11 +1224,14 @@ async function updateRouteLines(map, userLat, userLng) {
   }
 
   // Update Color if changed mode
-  routePolyline.setStyle({ color: usedHybrid ? '#10b981' : '#3b82f6' });
+  routePolyline.setStyle({ color: polyColor });
 
   // Update Stats UI
   const distEl = document.getElementById('stats-dist');
-  if (distEl) distEl.innerHTML = `<strong>Distance:</strong> ${dist.toFixed(2)} km ${usedHybrid ? '(On Route)' : ''}`;
+  if (distEl) {
+      const destPrefix = customDest ? '(To Stop) ' : '';
+      distEl.innerHTML = `<strong>Distance:</strong> ${destPrefix}${dist.toFixed(2)} km ${usedHybrid && !customDest ? '(On Route)' : ''}`;
+  }
 
   const etaEl = document.getElementById('stats-eta');
   if (etaEl) {
@@ -1214,12 +1353,24 @@ async function renderDashboardRoutes(filterText = '') {
 
     // Full route list
     let fullRouteHtml = '';
+    const hasCustomDest = window.customDestinations && window.customDestinations[route.name];
+    const resetBtnDisplay = hasCustomDest ? 'inline-block' : 'none';
+
     if (stops.length > 0) {
       stops.forEach((s, i) => {
         const isFirst = i === 0;
         const isLast = i === stops.length - 1;
         const className = isFirst ? 'start' : (isLast ? 'end' : '');
-        fullRouteHtml += `<div class="route-point ${className}"><strong>${escapeHtml(s.name)}</strong></div>`;
+        
+        const isActive = hasCustomDest && window.customDestinations[route.name].name === s.name;
+        const activeStyle = isActive ? "background: #dbeafe; border-left: 3px solid #3b82f6;" : "background: transparent;";
+        
+        const escapedRouteName = escapeHtml(route.name).replace(/'/g, "\\'");
+        const escapedStopName = escapeHtml(s.name).replace(/'/g, "\\'");
+        
+        const onclickAttr = `onclick="event.stopPropagation(); window.selectCustomStop('${escapedRouteName}', ${s.lat}, ${s.lng}, '${escapedStopName}', 'card-${idx}');"`;
+        
+        fullRouteHtml += `<div class="route-point ${className}" style="cursor: pointer; padding: 5px; border-radius: 4px; transition: background 0.2s; ${activeStyle}" onmouseover="if(!this.style.background.includes('dbeafe')){this.style.background='#f1f5f9'}" onmouseout="if(!this.style.background.includes('dbeafe')){this.style.background='transparent'}" ${onclickAttr}><strong>${escapeHtml(s.name)}</strong></div>`;
       });
     } else {
       fullRouteHtml = '<div style="color:#999;">No stops available</div>';
@@ -1228,6 +1379,7 @@ async function renderDashboardRoutes(filterText = '') {
     card.innerHTML = `
       <div class="bus-header">
         <h3><span>🚌</span> ${escapeHtml(route.name)}</h3>
+        <button class="close-map-btn" style="display:none; background:rgba(255,255,255,0.2); border:none; color:white; padding:5px 10px; border-radius:5px; cursor:pointer;" onclick="event.stopPropagation(); window['closeCard_${idx}']();">✕ Close</button>
         <div class="live-indicator"></div>
       </div>
       <div class="bus-map">
@@ -1241,7 +1393,7 @@ async function renderDashboardRoutes(filterText = '') {
             ${busDetailsHtml}
           </div>
           <div class="full-route-list">
-            <h4>Full Route</h4>
+            <h4>Full Route <button class="reset-location-btn" style="display:${resetBtnDisplay}; margin-left:10px; padding:2px 8px; font-size:12px; border:none; background:#3b82f6; color:white; border-radius:4px; cursor:pointer;" onclick="event.stopPropagation(); window.resetToUserLocation('${escapeHtml(route.name).replace(/'/g, "\\'")}', 'card-${idx}');">📍 Use My Location</button></h4>
             <div class="route-list">
               ${fullRouteHtml}
             </div>
@@ -1258,31 +1410,31 @@ async function renderDashboardRoutes(filterText = '') {
     // Card interactions
     let isExpanded = false;
 
-    const toggleExpand = () => {
-      isExpanded = !isExpanded;
-      if (isExpanded) {
-        card.classList.add('expanded');
+    const expandCard = () => {
+      if (isExpanded) return; // Do nothing if already expanded
+      
+      isExpanded = true;
+      const closeBtn = card.querySelector('.close-map-btn');
+      const liveIndicator = card.querySelector('.live-indicator');
 
-        // Start Live Tracking when expanded
-        console.log(`[Dashboard] Card expanded for ${route.name}. Checking map...`);
-        const map = routeMaps[mapId];
-        if (map) {
-          console.log("[Dashboard] Map found. Starting tracking...");
-          startLiveTracking(map, route.name, card.id);
+      card.classList.add('expanded');
+      if (closeBtn) closeBtn.style.display = 'block';
+      if (liveIndicator) liveIndicator.style.display = 'none';
 
-          // Force map resize fix
-          setTimeout(() => {
-            map.invalidateSize();
-          }, 200);
-        } else {
-          console.error("[Dashboard] Map object NOT found for " + mapId);
-          alert("Map Error: Please refresh the page.");
-        }
+      // Start Live Tracking when expanded
+      console.log(`[Dashboard] Card expanded for ${route.name}. Checking map...`);
+      const map = routeMaps[mapId];
+      if (map) {
+        console.log("[Dashboard] Map found. Starting tracking...");
+        startLiveTracking(map, route.name, card.id);
 
+        // Force map resize fix
+        setTimeout(() => {
+          map.invalidateSize();
+        }, 200);
       } else {
-        card.classList.remove('expanded');
-        // Optional: Stop tracking to save battery/data? 
-        // For now, we keep it running or logic can be added to stop.
+        console.error("[Dashboard] Map object NOT found for " + mapId);
+        alert("Map Error: Please refresh the page.");
       }
 
       // Invalidate map size after expansion
@@ -1299,7 +1451,24 @@ async function renderDashboardRoutes(filterText = '') {
       }, 300);
     };
 
-    card.addEventListener('click', toggleExpand);
+    const closeCard = () => {
+        isExpanded = false;
+        const closeBtn = card.querySelector('.close-map-btn');
+        const liveIndicator = card.querySelector('.live-indicator');
+        
+        card.classList.remove('expanded');
+        if (closeBtn) closeBtn.style.display = 'none';
+        if (liveIndicator) liveIndicator.style.display = 'block';
+    };
+    
+    // Bind the closeCard function to the window so the inline onclick can reach it for this specific card
+    window[`closeCard_${idx}`] = closeCard;
+
+    // Only expand when clicking the card (ignores clicks if already expanded)
+    card.addEventListener('click', (e) => {
+        // Prevent expanding if they clicked a button inside the card that has stopPropagation
+        expandCard();
+    });
 
     card.addEventListener('mouseenter', () => {
       if (!isExpanded) {
@@ -1394,6 +1563,6 @@ window.addEventListener('storage', function (e) {
 });
 
 // Initialize on load
-document.addEventListener('DOMContentLoaded', () => {
-  initDashboard();
+document.addEventListener('DOMContentLoaded', async () => {
+  await initDashboard();
 });
