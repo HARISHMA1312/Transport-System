@@ -949,6 +949,7 @@ function startLiveTracking(map, routeName, cardId) {
 
     const busLat = data.lat;
     const busLng = data.lng;
+    window.currentBusSpeedKmh = data.speed ? (data.speed * 3.6) : 0;
 
     // Update Bus Marker
     if (!busMarker) {
@@ -983,6 +984,7 @@ function startLiveTracking(map, routeName, cardId) {
       // console.log("[Dashboard] Geolocation received:", position.coords);
       const userLat = position.coords.latitude;
       const userLng = position.coords.longitude;
+      window.currentUserSpeedKmh = position.coords.speed ? (position.coords.speed * 3.6) : 0;
 
       // Update User Marker
       if (!userMarker) {
@@ -1118,8 +1120,10 @@ async function updateRouteLines(map, userLat, userLng) {
 
       // Calculate Distance along route
       dist = getRouteDistance(routeGeom, startIndex, endIndex) / 1000; // km
-      // Approx time
-      duration = (dist / 40) * 60; // default 40km/h
+      // Approx time using live speed
+      let effectiveSpeed = Math.max(window.currentBusSpeedKmh || 0, window.currentUserSpeedKmh || 0);
+      if (effectiveSpeed < 5) effectiveSpeed = 5; // Minimum 5km/h to avoid infinity
+      duration = (dist / effectiveSpeed) * 60;
     }
   }
 
@@ -1127,15 +1131,21 @@ async function updateRouteLines(map, userLat, userLng) {
   if (!usedHybrid) {
     // Try to get road path
     const routeData = await fetchRoutePath(targetPos, busPos);
+    let effectiveSpeed = Math.max(window.currentBusSpeedKmh || 0, window.currentUserSpeedKmh || 0);
 
     if (routeData) {
       latlngs = routeData.path;
       dist = routeData.distance / 1000; // km
-      duration = routeData.duration / 60; // mins
+      if (effectiveSpeed > 5) {
+          duration = (dist / effectiveSpeed) * 60;
+      } else {
+          duration = routeData.duration / 60; // mins (OSRM default)
+      }
     } else {
       // Straight line fallback
       dist = getDistanceFromLatLonInKm(targetPos.lat, targetPos.lng, busPos.lat, busPos.lng);
-      duration = (dist / 40) * 60;
+      if (effectiveSpeed < 5) effectiveSpeed = 5;
+      duration = (dist / effectiveSpeed) * 60;
     }
   }
 
